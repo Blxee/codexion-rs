@@ -7,13 +7,13 @@ use std::{
 
 #[derive(Clone, Copy, Debug)]
 struct Args {
-    number_of_coders: u32,
-    time_to_burnout: u32,
-    time_to_compile: u32,
-    time_to_debug: u32,
-    time_to_refactor: u32,
-    number_of_compiles_required: u32,
-    dongle_cooldown: u32,
+    number_of_coders: u64,
+    time_to_burnout: u64,
+    time_to_compile: u64,
+    time_to_debug: u64,
+    time_to_refactor: u64,
+    number_of_compiles_required: u64,
+    dongle_cooldown: u64,
     scheduler: Scheduler,
 }
 
@@ -21,6 +21,19 @@ struct Args {
 enum Scheduler {
     FIFO,
     EDF,
+}
+
+#[derive(Debug)]
+struct Coder {
+    last_compile: u64,
+    state: CoderState,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum CoderState {
+    Compiling,
+    Debuggin,
+    Refactoring,
 }
 
 fn parse_args() -> Args {
@@ -33,7 +46,7 @@ fn parse_args() -> Args {
 
     let scheduler = args[8].clone();
 
-    let int_args: Vec<u32> = args
+    let int_args: Vec<u64> = args
         .into_iter()
         .skip(1)
         .take(7)
@@ -73,15 +86,27 @@ fn parse_args() -> Args {
 
 fn main() {
     let program_args = parse_args();
-    println!("args: {program_args:?}");
+
     let mut thread_handles = vec![];
     let program_start = Instant::now();
 
-    for i in 0..5 {
+    for i in 1..=program_args.number_of_coders {
         thread_handles.push(spawn(move || {
-            sleep(Duration::from_millis(10 * i));
-            let time = program_start.elapsed().as_millis();
-            println!("hello from thread {i}: {time}");
+            let mut time = program_start.elapsed().as_millis();
+            {
+                println!("{time} {i} has taken a dongle");
+            }
+            time = program_start.elapsed().as_millis();
+            println!("{time} {i} is compiling");
+            sleep(Duration::from_millis(program_args.time_to_compile));
+            time = program_start.elapsed().as_millis();
+            println!("{time} {i} is debugging");
+            sleep(Duration::from_millis(program_args.time_to_debug));
+            time = program_start.elapsed().as_millis();
+            println!("{time} {i} is refactoring");
+            sleep(Duration::from_millis(program_args.time_to_refactor));
+            time = program_start.elapsed().as_millis();
+            println!("{time} {i} burned out");
         }));
     }
 
