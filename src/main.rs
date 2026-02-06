@@ -1,6 +1,7 @@
 use std::{
     env,
     process::exit,
+    sync::{Arc, Condvar, Mutex},
     thread::{sleep, spawn},
     time::{Duration, Instant},
 };
@@ -8,12 +9,12 @@ use std::{
 #[derive(Clone, Copy, Debug)]
 struct Args {
     number_of_coders: u64,
-    time_to_burnout: u64,
-    time_to_compile: u64,
-    time_to_debug: u64,
-    time_to_refactor: u64,
+    time_to_burnout: Duration,
+    time_to_compile: Duration,
+    time_to_debug: Duration,
+    time_to_refactor: Duration,
     number_of_compiles_required: u64,
-    dongle_cooldown: u64,
+    dongle_cooldown: Duration,
     scheduler: Scheduler,
 }
 
@@ -23,17 +24,59 @@ enum Scheduler {
     EDF,
 }
 
+type Dongle = Arc<(Mutex<Duration>, Condvar)>;
+
 #[derive(Debug)]
 struct Coder {
-    last_compile: u64,
-    state: CoderState,
+    coder_number: u64,
+    last_compile: Duration,
+    dongle1: Dongle,
+    dongle2: Dongle,
+    time_to_compile: Duration,
+    time_to_debug: Duration,
+    time_to_refactor: Duration,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum CoderState {
-    Compiling,
-    Debuggin,
-    Refactoring,
+impl Coder {
+    fn new(
+        coder_number: u64,
+        dongles: [Dongle; 2],
+        time_to_compile: Duration,
+        time_to_debug: Duration,
+        time_to_refactor: Duration,
+    ) -> Self {
+        let [dongle1, dongle2] = dongles;
+        Self {
+            coder_number,
+            last_compile: Duration::ZERO,
+            dongle1,
+            dongle2,
+            time_to_compile,
+            time_to_debug,
+            time_to_refactor,
+        }
+    }
+
+    fn complie(&mut self, program_start: Instant) {
+        let now = program_start.elapsed();
+        println!("{:?} {} has taken a dongle", now, self.coder_number);
+
+        self.last_compile = now;
+        println!("{:?} {} is compiling", now, self.coder_number);
+        sleep(self.time_to_compile);
+    }
+
+    fn debug(&mut self, program_start: Instant) {
+        let now = program_start.elapsed();
+        println!("{:?} {} is debugging", now, self.coder_number);
+        sleep(self.time_to_debug);
+    }
+
+    fn refactor(&mut self, program_start: Instant) {
+        let now = program_start.elapsed();
+        println!("{:?} {} is refactoring", now, self.coder_number);
+        sleep(self.time_to_debug);
+    }
 }
 
 fn parse_args() -> Args {
@@ -72,6 +115,12 @@ fn parse_args() -> Args {
         _ => panic!("[Error]: invalid scheduler value"),
     };
 
+    let time_to_burnout = Duration::from_millis(time_to_burnout);
+    let time_to_compile = Duration::from_millis(time_to_compile);
+    let time_to_debug = Duration::from_millis(time_to_debug);
+    let time_to_refactor = Duration::from_millis(time_to_refactor);
+    let dongle_cooldown = Duration::from_millis(dongle_cooldown);
+
     Args {
         number_of_coders,
         time_to_burnout,
@@ -90,23 +139,39 @@ fn main() {
     let mut thread_handles = vec![];
     let program_start = Instant::now();
 
-    for i in 1..=program_args.number_of_coders {
+    let mut dongles = Vec::new();
+    for _ in 0..program_args.number_of_coders {
+        dongles.push(Arc::new((
+            Mutex::new(program_start.elapsed()),
+            Condvar::new(),
+        )));
+    }
+
+    for i in 0..program_args.number_of_coders {
+        let left_dongle = if i == 0 {
+            dongles.last().unwrap()
+        } else {
+            &dongles[i as usize - 1]
+        };
+
+        let right_dongle = if i as usize == dongles.len() - 1 {
+            &dongles[0]
+        } else {
+            &dongles[i as usize - 1]
+        };
+
+        let dongles = [Arc::clone(left_dongle), Arc::clone(right_dongle)];
+
         thread_handles.push(spawn(move || {
-            let mut time = program_start.elapsed().as_millis();
-            {
-                println!("{time} {i} has taken a dongle");
-            }
-            time = program_start.elapsed().as_millis();
-            println!("{time} {i} is compiling");
-            sleep(Duration::from_millis(program_args.time_to_compile));
-            time = program_start.elapsed().as_millis();
-            println!("{time} {i} is debugging");
-            sleep(Duration::from_millis(program_args.time_to_debug));
-            time = program_start.elapsed().as_millis();
-            println!("{time} {i} is refactoring");
-            sleep(Duration::from_millis(program_args.time_to_refactor));
-            time = program_start.elapsed().as_millis();
-            println!("{time} {i} burned out");
+            let coder = Coder::new(
+                i + 1,
+                dongles,
+                program_args.time_to_compile,
+                program_args.time_to_debug,
+                program_args.time_to_refactor,
+            );
+
+            println!("{} {i} burned out", 0);
         }));
     }
 
