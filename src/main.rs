@@ -24,62 +24,97 @@ enum Scheduler {
     EDF,
 }
 
-type Dongle = Arc<(Mutex<Duration>, Condvar)>;
+#[derive(Debug)]
+struct Dongle {
+    last_release: Mutex<Instant>,
+    cv: Condvar,
+    cooldown: Duration,
+}
 
 #[derive(Debug)]
 struct Coder {
     coder_number: u64,
     last_compile: Duration,
     compiles_left: u64,
-    dongle1: Dongle,
-    dongle2: Dongle,
+    dongle_left: Arc<Dongle>,
+    dongle_right: Arc<Dongle>,
     time_to_compile: Duration,
     time_to_debug: Duration,
     time_to_refactor: Duration,
+}
+
+impl Dongle {
+    fn new(cooldown: Duration) -> Self {
+        Self {
+            last_release: Mutex::new(Instant::now()),
+            cv: Condvar::new(),
+            cooldown,
+        }
+    }
 }
 
 impl Coder {
     fn new(
         coder_number: u64,
         number_of_compiles_required: u64,
-        dongles: [Dongle; 2],
+        dongles: [Arc<Dongle>; 2],
         time_to_compile: Duration,
         time_to_debug: Duration,
         time_to_refactor: Duration,
     ) -> Self {
-        let [dongle1, dongle2] = dongles;
+        let [dongle_left, dongle_right] = dongles;
         Self {
             coder_number,
             last_compile: Duration::ZERO,
             compiles_left: number_of_compiles_required,
-            dongle1,
-            dongle2,
+            dongle_left,
+            dongle_right,
             time_to_compile,
             time_to_debug,
             time_to_refactor,
         }
     }
 
-    fn complie(&mut self, program_start: Instant) {
-        let now = program_start.elapsed();
-        println!("{:?} {} has taken a dongle", now, self.coder_number);
+    fn compile(&mut self, program_start: Instant) {
+        let mut dongle_left = self.dongle_left.last_release.lock().unwrap();
+        println!(
+            "{:10} {} has taken a dongle",
+            program_start.elapsed().as_millis(),
+            self.coder_number
+        );
 
+        let mut dongle_right = self.dongle_right.last_release.lock().unwrap();
+        println!(
+            "{:10} {} has taken a dongle",
+            program_start.elapsed().as_millis(),
+            self.coder_number
+        );
+
+        let now = program_start.elapsed();
         self.last_compile = now;
-        println!("{:?} {} is compiling", now, self.coder_number);
+        println!("{:10} {} is compiling", now.as_millis(), self.coder_number);
         sleep(self.time_to_compile);
+
+        *dongle_left = Instant::now();
+        *dongle_right = Instant::now();
+
         self.compiles_left -= 1;
     }
 
     fn debug(&mut self, program_start: Instant) {
         let now = program_start.elapsed();
-        println!("{:?} {} is debugging", now, self.coder_number);
+        println!("{:10} {} is debugging", now.as_millis(), self.coder_number);
         sleep(self.time_to_debug);
     }
 
     fn refactor(&mut self, program_start: Instant) {
         let now = program_start.elapsed();
-        println!("{:?} {} is refactoring", now, self.coder_number);
-        sleep(self.time_to_debug);
+        println!(
+            "{:10} {} is refactoring",
+            now.as_millis(),
+            self.coder_number
+        );
+        sleep(self.time_to_refactor);
     }
 }
 
@@ -145,10 +180,7 @@ fn main() {
 
     let mut dongles = Vec::new();
     for _ in 0..program_args.number_of_coders {
-        dongles.push(Arc::new((
-            Mutex::new(program_start.elapsed()),
-            Condvar::new(),
-        )));
+        dongles.push(Arc::new(Dongle::new(program_args.dongle_cooldown)));
     }
 
     for i in 0..program_args.number_of_coders {
@@ -177,7 +209,7 @@ fn main() {
             );
 
             while coder.compiles_left > 0 {
-                coder.complie(program_start);
+                coder.compile(program_start);
                 coder.debug(program_start);
                 coder.refactor(program_start);
             }
