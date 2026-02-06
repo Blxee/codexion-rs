@@ -30,6 +30,7 @@ type Dongle = Arc<(Mutex<Duration>, Condvar)>;
 struct Coder {
     coder_number: u64,
     last_compile: Duration,
+    compiles_left: u64,
     dongle1: Dongle,
     dongle2: Dongle,
     time_to_compile: Duration,
@@ -40,6 +41,7 @@ struct Coder {
 impl Coder {
     fn new(
         coder_number: u64,
+        number_of_compiles_required: u64,
         dongles: [Dongle; 2],
         time_to_compile: Duration,
         time_to_debug: Duration,
@@ -49,6 +51,7 @@ impl Coder {
         Self {
             coder_number,
             last_compile: Duration::ZERO,
+            compiles_left: number_of_compiles_required,
             dongle1,
             dongle2,
             time_to_compile,
@@ -64,6 +67,7 @@ impl Coder {
         self.last_compile = now;
         println!("{:?} {} is compiling", now, self.coder_number);
         sleep(self.time_to_compile);
+        self.compiles_left -= 1;
     }
 
     fn debug(&mut self, program_start: Instant) {
@@ -157,24 +161,30 @@ fn main() {
         let right_dongle = if i as usize == dongles.len() - 1 {
             &dongles[0]
         } else {
-            &dongles[i as usize - 1]
+            &dongles[i as usize + 1]
         };
 
         let dongles = [Arc::clone(left_dongle), Arc::clone(right_dongle)];
 
         thread_handles.push(spawn(move || {
-            let coder = Coder::new(
+            let mut coder = Coder::new(
                 i + 1,
+                program_args.number_of_compiles_required,
                 dongles,
                 program_args.time_to_compile,
                 program_args.time_to_debug,
                 program_args.time_to_refactor,
             );
 
-            println!("{} {i} burned out", 0);
+            while coder.compiles_left > 0 {
+                coder.complie(program_start);
+                coder.debug(program_start);
+                coder.refactor(program_start);
+            }
         }));
     }
 
+    println!("{} {} burned out", 0, 0);
     thread_handles.into_iter().for_each(|t| {
         let _ = t.join();
     });
