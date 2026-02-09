@@ -1,5 +1,5 @@
 use std::{
-    sync::{Condvar, Mutex},
+    sync::{Condvar, Mutex, MutexGuard},
     time::{Duration, Instant},
 };
 
@@ -19,7 +19,7 @@ impl Dongle {
         }
     }
 
-    pub fn acquire(&self) {
+    pub fn acquire(&self) -> MutexGuard<'_, Instant> {
         let mut guard = self.next_available.lock().unwrap();
         let mut cooldown_left = *guard - Instant::now();
 
@@ -27,10 +27,10 @@ impl Dongle {
             (guard, _) = self.cv.wait_timeout(guard, cooldown_left).unwrap();
             cooldown_left = *guard - Instant::now();
         }
+        guard
     }
 
-    pub fn release(&self) {
-        let mut guard = self.next_available.lock().unwrap();
+    pub fn release(&self, mut guard: MutexGuard<'_, Instant>) {
         *guard = Instant::now() + self.cooldown;
     }
 }
