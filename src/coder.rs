@@ -41,14 +41,14 @@ impl Coder {
     }
 
     pub fn compile(&mut self, program_start: Instant) {
-        let mut dongle_left = self.dongle_left.last_release.lock().unwrap();
+        self.dongle_left.acquire();
         println!(
             "{:10} {} has taken a dongle",
             program_start.elapsed().as_millis(),
             self.coder_number
         );
 
-        let mut dongle_right = self.dongle_right.last_release.lock().unwrap();
+        self.dongle_right.acquire();
         println!(
             "{:10} {} has taken a dongle",
             program_start.elapsed().as_millis(),
@@ -60,8 +60,8 @@ impl Coder {
         println!("{:10} {} is compiling", now.as_millis(), self.coder_number);
         sleep(self.time_to_compile);
 
-        *dongle_left = Instant::now();
-        *dongle_right = Instant::now();
+        self.dongle_right.release();
+        self.dongle_left.release();
 
         self.compiles_left -= 1;
     }

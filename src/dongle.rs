@@ -5,7 +5,7 @@ use std::{
 
 #[derive(Debug)]
 pub struct Dongle {
-    pub last_release: Mutex<Instant>,
+    pub next_available: Mutex<Instant>,
     pub cv: Condvar,
     pub cooldown: Duration,
 }
@@ -13,9 +13,24 @@ pub struct Dongle {
 impl Dongle {
     pub fn new(cooldown: Duration) -> Self {
         Self {
-            last_release: Mutex::new(Instant::now()),
+            next_available: Mutex::new(Instant::now()),
             cv: Condvar::new(),
             cooldown,
         }
+    }
+
+    pub fn acquire(&self) {
+        let mut guard = self.next_available.lock().unwrap();
+        let mut cooldown_left = *guard - Instant::now();
+
+        while !cooldown_left.is_zero() {
+            (guard, _) = self.cv.wait_timeout(guard, cooldown_left).unwrap();
+            cooldown_left = *guard - Instant::now();
+        }
+    }
+
+    pub fn release(&self) {
+        let mut guard = self.next_available.lock().unwrap();
+        *guard = Instant::now() + self.cooldown;
     }
 }

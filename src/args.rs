@@ -1,4 +1,4 @@
-use std::{env, process::exit, time::Duration};
+use std::{env, path::Path, process::exit, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Args {
@@ -23,6 +23,12 @@ pub fn parse_args() -> Args {
 
     if args.len() != 9 {
         eprintln!("[Error]: wrong number of arguments");
+        println!(
+            "\
+{} <number_of_coders> <time_to_burnout> <time_to_compile> <time_to_debug> <time_to_refactor> <number_of_compiles_required> <dongle_cooldown> <scheduler>\
+            ",
+            args[0].split('/').last().unwrap()
+        );
         exit(0);
     }
 
