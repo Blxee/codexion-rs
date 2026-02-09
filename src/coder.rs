@@ -1,5 +1,5 @@
 use std::{
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -9,7 +9,7 @@ use crate::dongle::Dongle;
 #[derive(Debug)]
 pub struct Coder {
     pub coder_number: u64,
-    pub last_compile: Duration,
+    pub last_compile: Arc<Mutex<Instant>>,
     pub compiles_left: u64,
     pub dongle_left: Arc<Dongle>,
     pub dongle_right: Arc<Dongle>,
@@ -30,7 +30,7 @@ impl Coder {
         let [dongle_left, dongle_right] = dongles;
         Self {
             coder_number,
-            last_compile: Duration::ZERO,
+            last_compile: Arc::new(Mutex::new(Instant::now())),
             compiles_left: number_of_compiles_required,
             dongle_left,
             dongle_right,
@@ -41,6 +41,7 @@ impl Coder {
     }
 
     pub fn compile(&mut self, program_start: Instant) {
+        // try to acquire left dongle.
         let guard_left = self.dongle_left.acquire();
         println!(
             "{:10} {} has taken a dongle",
@@ -48,6 +49,7 @@ impl Coder {
             self.coder_number
         );
 
+        // try to acquire right dongle.
         let guard_right = self.dongle_right.acquire();
         println!(
             "{:10} {} has taken a dongle",
@@ -55,11 +57,16 @@ impl Coder {
             self.coder_number
         );
 
+        // Update last compile instant to now.
+        {
+            let mut last_compile = self.last_compile.lock().unwrap();
+            *last_compile = Instant::now();
+        }
         let now = program_start.elapsed();
-        self.last_compile = now;
         println!("{:10} {} is compiling", now.as_millis(), self.coder_number);
         sleep(self.time_to_compile);
 
+        // Release both dongles.
         self.dongle_right.release(guard_left);
         self.dongle_left.release(guard_right);
 
