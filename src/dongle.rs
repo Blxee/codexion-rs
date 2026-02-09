@@ -32,5 +32,6 @@ impl Dongle {
 
     pub fn release(&self, mut guard: MutexGuard<'_, Instant>) {
         *guard = Instant::now() + self.cooldown;
+        self.cv.notify_all();
     }
 }
