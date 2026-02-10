@@ -1,6 +1,6 @@
 use std::{
     sync::{Arc, Mutex},
-    thread::{sleep, spawn},
+    thread::sleep,
     time::{Duration, Instant},
 };
 
@@ -51,7 +51,7 @@ impl Coder {
         // try to acquire the first dongle.
         first.acquire();
         println!(
-            "{:10} {} has taken a dongle",
+            "{:10} \x1b[36m{}\x1b[0m has taken a dongle 🔌",
             program_start.elapsed().as_millis(),
             self.coder_number
         );
@@ -59,7 +59,7 @@ impl Coder {
         // try to acquire second dongle.
         second.acquire();
         println!(
-            "{:10} {} has taken a dongle",
+            "{:10} \x1b[36m{}\x1b[0m has taken a dongle 🔌",
             program_start.elapsed().as_millis(),
             self.coder_number
         );
@@ -70,7 +70,11 @@ impl Coder {
             *last_compile = Instant::now();
         }
         let now = program_start.elapsed();
-        println!("{:10} {} is compiling", now.as_millis(), self.coder_number);
+        println!(
+            "{:10} \x1b[36m{}\x1b[0m is \x1b[32mcompiling\x1b[0m\t🚀",
+            now.as_millis(),
+            self.coder_number
+        );
         sleep(self.time_to_compile);
 
         // Release both dongles.
@@ -82,14 +86,18 @@ impl Coder {
 
     pub fn debug(&mut self, program_start: Instant) {
         let now = program_start.elapsed();
-        println!("{:10} {} is debugging", now.as_millis(), self.coder_number);
+        println!(
+            "{:10} \x1b[36m{}\x1b[0m is \x1b[33mdebugging\x1b[0m\t👾",
+            now.as_millis(),
+            self.coder_number
+        );
         sleep(self.time_to_debug);
     }
 
     pub fn refactor(&mut self, program_start: Instant) {
         let now = program_start.elapsed();
         println!(
-            "{:10} {} is refactoring",
+            "{:10} \x1b[36m{}\x1b[0m is \x1b[33mrefactoring\x1b[0m\t🛠️",
             now.as_millis(),
             self.coder_number
         );

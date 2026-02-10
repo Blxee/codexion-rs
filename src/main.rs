@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::spawn;
 use std::time::{Duration, Instant};
 
-use crate::args::{Args, parse_args};
+use crate::args::parse_args;
 use crate::coder::Coder;
 use crate::dongle::Dongle;
 
@@ -29,7 +29,7 @@ fn burnout_tracker(
             let last_compile = last_compile.lock().unwrap();
             if last_compile.elapsed() > time_to_burnout {
                 println!(
-                    "{:10} {} burned out",
+                    "{:10} \x1b[31m{} burned out\x1b[0m\t\t😩",
                     program_start.elapsed().as_millis(),
                     i + 1
                 );

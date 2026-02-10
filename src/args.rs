@@ -1,4 +1,4 @@
-use std::{env, path::Path, process::exit, time::Duration};
+use std::{env, process::exit, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Args {

@@ -1,5 +1,5 @@
 use std::{
-    sync::{Condvar, Mutex, MutexGuard},
+    sync::{Condvar, Mutex},
     time::{Duration, Instant},
 };
 
