@@ -1,6 +1,6 @@
 use std::{
     sync::{Arc, Mutex},
-    thread::sleep,
+    thread::{sleep, spawn},
     time::{Duration, Instant},
 };
 
@@ -42,21 +42,31 @@ impl Coder {
 
     pub fn compile(&mut self, program_start: Instant) {
         // try to acquire left dongle.
-        let guard_left = self.dongle_left.acquire();
-        println!(
-            "{:10} {} has taken a dongle",
-            program_start.elapsed().as_millis(),
-            self.coder_number
-        );
+        let dongle_left = Arc::clone(&self.dongle_left);
+        let coder_number = self.coder_number;
+        let left_hand_thread = spawn(move || {
+            dongle_left.acquire();
+            println!(
+                "{:10} {} has taken a dongle",
+                program_start.elapsed().as_millis(),
+                coder_number
+            );
+        });
 
         // try to acquire right dongle.
-        let guard_right = self.dongle_right.acquire();
-        println!(
-            "{:10} {} has taken a dongle",
-            program_start.elapsed().as_millis(),
-            self.coder_number
-        );
+        let dongle_right = Arc::clone(&self.dongle_right);
+        let coder_number = self.coder_number;
+        let right_hand_thread = spawn(move || {
+            dongle_right.acquire();
+            println!(
+                "{:10} {} has taken a dongle",
+                program_start.elapsed().as_millis(),
+                coder_number
+            );
+        });
 
+        left_hand_thread.join().unwrap();
+        right_hand_thread.join().unwrap();
         // Update last compile instant to now.
         {
             let mut last_compile = self.last_compile.lock().unwrap();
@@ -67,8 +77,8 @@ impl Coder {
         sleep(self.time_to_compile);
 
         // Release both dongles.
-        self.dongle_right.release(guard_left);
-        self.dongle_left.release(guard_right);
+        self.dongle_right.release();
+        self.dongle_left.release();
 
         self.compiles_left -= 1;
     }
