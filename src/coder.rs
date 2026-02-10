@@ -41,32 +41,29 @@ impl Coder {
     }
 
     pub fn compile(&mut self, program_start: Instant) {
-        // try to acquire left dongle.
-        let dongle_left = Arc::clone(&self.dongle_left);
-        let coder_number = self.coder_number;
-        let left_hand_thread = spawn(move || {
-            dongle_left.acquire();
-            println!(
-                "{:10} {} has taken a dongle",
-                program_start.elapsed().as_millis(),
-                coder_number
-            );
-        });
+        // make the even coders try to acquire the left dongle first and vise versa
+        let (first, second) = if self.coder_number % 2 == 0 {
+            (&self.dongle_left, &self.dongle_right)
+        } else {
+            (&self.dongle_right, &self.dongle_left)
+        };
 
-        // try to acquire right dongle.
-        let dongle_right = Arc::clone(&self.dongle_right);
-        let coder_number = self.coder_number;
-        let right_hand_thread = spawn(move || {
-            dongle_right.acquire();
-            println!(
-                "{:10} {} has taken a dongle",
-                program_start.elapsed().as_millis(),
-                coder_number
-            );
-        });
+        // try to acquire the first dongle.
+        first.acquire();
+        println!(
+            "{:10} {} has taken a dongle",
+            program_start.elapsed().as_millis(),
+            self.coder_number
+        );
 
-        left_hand_thread.join().unwrap();
-        right_hand_thread.join().unwrap();
+        // try to acquire second dongle.
+        second.acquire();
+        println!(
+            "{:10} {} has taken a dongle",
+            program_start.elapsed().as_millis(),
+            self.coder_number
+        );
+
         // Update last compile instant to now.
         {
             let mut last_compile = self.last_compile.lock().unwrap();
