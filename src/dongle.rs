@@ -22,22 +22,26 @@ impl Dongle {
     pub fn acquire(&self) {
         let mut guard = self.next_available.lock().unwrap();
 
-        // if a coder is currently holding the dongle, wait indefinitely.
-        while guard.is_none() {
-            guard = self.cv.wait(guard).unwrap();
-        }
+        loop {
+            match *guard {
+                None => {
+                    // if a coder is currently holding the dongle, wait indefinitely.
+                    guard = self.cv.wait(guard).unwrap();
+                }
+                Some(next_available) => {
+                    let now = Instant::now();
 
-        // wait for the cooldown to end.
-        let next_available = guard.unwrap();
-        while next_available > Instant::now() {
-            (guard, _) = self
-                .cv
-                .wait_timeout(guard, next_available - Instant::now())
-                .unwrap();
+                    if next_available > now {
+                        // wait for the cooldown to end.
+                        (guard, _) = self.cv.wait_timeout(guard, next_available - now).unwrap();
+                    } else {
+                        // make the dongle not available while being held
+                        *guard = None;
+                        return;
+                    }
+                }
+            }
         }
-
-        // make the dongle not available while being held
-        *guard = None;
     }
 
     pub fn release(&self) {
