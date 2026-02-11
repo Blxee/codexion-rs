@@ -2,7 +2,7 @@ use std::{env, process::exit, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Args {
-    pub number_of_coders: u64,
+    pub number_of_coders: usize,
     pub time_to_burnout: Duration,
     pub time_to_compile: Duration,
     pub time_to_debug: Duration,
@@ -67,7 +67,7 @@ pub fn parse_args() -> Args {
     let dongle_cooldown = Duration::from_millis(dongle_cooldown);
 
     Args {
-        number_of_coders,
+        number_of_coders: number_of_coders as usize,
         time_to_burnout,
         time_to_compile,
         time_to_debug,

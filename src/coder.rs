@@ -8,7 +8,7 @@ use crate::dongle::Dongle;
 
 #[derive(Debug)]
 pub struct Coder {
-    pub coder_number: u64,
+    pub coder_number: usize,
     pub last_compile: Arc<Mutex<Instant>>,
     pub compiles_left: u64,
     pub dongle_left: Arc<Dongle>,
@@ -20,7 +20,7 @@ pub struct Coder {
 
 impl Coder {
     pub fn new(
-        coder_number: u64,
+        coder_number: usize,
         number_of_compiles_required: u64,
         dongles: [Arc<Dongle>; 2],
         time_to_compile: Duration,

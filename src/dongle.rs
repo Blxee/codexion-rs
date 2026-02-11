@@ -1,5 +1,5 @@
 use std::{
-    sync::{Condvar, Mutex},
+    sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
 };
 
@@ -8,14 +8,16 @@ pub struct Dongle {
     pub next_available: Mutex<Option<Instant>>,
     pub cv: Condvar,
     pub cooldown: Duration,
+    shutdown: Arc<Mutex<bool>>,
 }
 
 impl Dongle {
-    pub fn new(cooldown: Duration) -> Self {
+    pub fn new(cooldown: Duration, shutdown: Arc<Mutex<bool>>) -> Self {
         Self {
             next_available: Mutex::new(Some(Instant::now())),
             cv: Condvar::new(),
             cooldown,
+            shutdown,
         }
     }
 
@@ -23,6 +25,14 @@ impl Dongle {
         let mut guard = self.next_available.lock().unwrap();
 
         loop {
+            // if the shutdown signal has been sent by the burnout tracker, exit
+            {
+                let shutdown = self.shutdown.lock().unwrap();
+                if *shutdown {
+                    return;
+                }
+            }
+
             match *guard {
                 None => {
                     // if a coder is currently holding the dongle, wait indefinitely.
