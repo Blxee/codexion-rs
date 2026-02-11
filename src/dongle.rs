@@ -1,3 +1,4 @@
+use DongleState::*;
 use std::{
     sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
@@ -5,16 +6,22 @@ use std::{
 
 #[derive(Debug)]
 pub struct Dongle {
-    pub next_available: Mutex<Option<Instant>>,
+    state: Mutex<DongleState>,
     pub cv: Condvar,
     pub cooldown: Duration,
     shutdown: Arc<Mutex<bool>>,
 }
 
+#[derive(Debug)]
+enum DongleState {
+    Held,
+    CooldownUntil(Instant),
+}
+
 impl Dongle {
     pub fn new(cooldown: Duration, shutdown: Arc<Mutex<bool>>) -> Self {
         Self {
-            next_available: Mutex::new(Some(Instant::now())),
+            state: Mutex::new(CooldownUntil(Instant::now())),
             cv: Condvar::new(),
             cooldown,
             shutdown,
@@ -22,7 +29,7 @@ impl Dongle {
     }
 
     pub fn acquire(&self) {
-        let mut guard = self.next_available.lock().unwrap();
+        let mut guard = self.state.lock().unwrap();
 
         loop {
             // if the shutdown signal has been sent by the burnout tracker, exit
@@ -34,11 +41,11 @@ impl Dongle {
             }
 
             match *guard {
-                None => {
+                Held => {
                     // if a coder is currently holding the dongle, wait indefinitely.
                     guard = self.cv.wait(guard).unwrap();
                 }
-                Some(next_available) => {
+                CooldownUntil(next_available) => {
                     let now = Instant::now();
 
                     if next_available > now {
@@ -46,7 +53,7 @@ impl Dongle {
                         (guard, _) = self.cv.wait_timeout(guard, next_available - now).unwrap();
                     } else {
                         // make the dongle not available while being held
-                        *guard = None;
+                        *guard = Held;
                         return;
                     }
                 }
@@ -55,9 +62,9 @@ impl Dongle {
     }
 
     pub fn release(&self) {
-        let mut guard = self.next_available.lock().unwrap();
+        let mut guard = self.state.lock().unwrap();
         // make the dongle acquirable after cooldown from now.
-        *guard = Some(Instant::now() + self.cooldown);
+        *guard = CooldownUntil(Instant::now() + self.cooldown);
         // notify all the coder that the dongle has been released.
         self.cv.notify_all();
     }

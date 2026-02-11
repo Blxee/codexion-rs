@@ -13,7 +13,7 @@ pub struct Args {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Scheduler {
+pub enum Scheduler {
     FIFO,
     EDF,
 }
