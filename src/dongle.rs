@@ -18,6 +18,16 @@ enum DongleState {
     CooldownUntil(Instant),
 }
 
+pub struct DongleGuard<'a> {
+    dongle: &'a Dongle,
+}
+
+impl<'a> Drop for DongleGuard<'a> {
+    fn drop(&mut self) {
+        self.dongle.release();
+    }
+}
+
 impl Dongle {
     pub fn new(cooldown: Duration, shutdown: Arc<Mutex<bool>>) -> Self {
         Self {
@@ -28,7 +38,7 @@ impl Dongle {
         }
     }
 
-    pub fn acquire(&self) {
+    pub fn acquire<'a>(&'a self) -> Option<DongleGuard<'a>> {
         let mut guard = self.state.lock().unwrap();
 
         loop {
@@ -36,7 +46,7 @@ impl Dongle {
             {
                 let shutdown = self.shutdown.lock().unwrap();
                 if *shutdown {
-                    return;
+                    return None;
                 }
             }
 
@@ -54,7 +64,7 @@ impl Dongle {
                     } else {
                         // make the dongle not available while being held
                         *guard = Held;
-                        return;
+                        return Some(DongleGuard { dongle: self });
                     }
                 }
             }

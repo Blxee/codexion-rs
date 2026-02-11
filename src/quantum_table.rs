@@ -95,10 +95,12 @@ impl QuantumTable {
                 return;
             }
             coder.compile(program_start);
+
             if Self::should_shutdown(&shutdown) {
                 return;
             }
             coder.debug(program_start);
+
             if Self::should_shutdown(&shutdown) {
                 return;
             }

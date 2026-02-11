@@ -49,7 +49,9 @@ impl Coder {
         };
 
         // try to acquire the first dongle.
-        first.acquire();
+        let Some(_first_handle) = first.acquire() else {
+            return;
+        };
         println!(
             "{:10} \x1b[36m{}\x1b[0m has taken a dongle 🔌",
             program_start.elapsed().as_millis(),
@@ -57,7 +59,9 @@ impl Coder {
         );
 
         // try to acquire second dongle.
-        second.acquire();
+        let Some(_second_handle) = second.acquire() else {
+            return;
+        };
         println!(
             "{:10} \x1b[36m{}\x1b[0m has taken a dongle 🔌",
             program_start.elapsed().as_millis(),
@@ -77,9 +81,7 @@ impl Coder {
         );
         sleep(self.time_to_compile);
 
-        // Release both dongles.
-        self.dongle_right.release();
-        self.dongle_left.release();
+        // dongles are automatically released when the dongleguard is dropped
 
         self.compiles_left -= 1;
     }
