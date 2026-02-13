@@ -49,7 +49,7 @@ impl Coder {
         };
 
         // try to acquire the first dongle.
-        let Some(_first_handle) = first.acquire() else {
+        let Some(_first_handle) = first.acquire(self.coder_number) else {
             return;
         };
         println!(
@@ -59,7 +59,7 @@ impl Coder {
         );
 
         // try to acquire second dongle.
-        let Some(_second_handle) = second.acquire() else {
+        let Some(_second_handle) = second.acquire(self.coder_number) else {
             return;
         };
         println!(

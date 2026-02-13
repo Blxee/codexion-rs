@@ -1,15 +1,17 @@
 use DongleState::*;
 use std::{
+    collections::VecDeque,
     sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
 };
 
 #[derive(Debug)]
 pub struct Dongle {
-    state: Mutex<DongleState>,
     pub cv: Condvar,
-    pub cooldown: Duration,
+    state: Mutex<DongleState>,
+    cooldown: Duration,
     shutdown: Arc<Mutex<bool>>,
+    priority_queue: Mutex<VecDeque<usize>>,
 }
 
 #[derive(Debug)]
@@ -31,15 +33,22 @@ impl<'a> Drop for DongleGuard<'a> {
 impl Dongle {
     pub fn new(cooldown: Duration, shutdown: Arc<Mutex<bool>>) -> Self {
         Self {
-            state: Mutex::new(CooldownUntil(Instant::now())),
             cv: Condvar::new(),
+            state: Mutex::new(CooldownUntil(Instant::now())),
             cooldown,
             shutdown,
+            priority_queue: Mutex::new(VecDeque::new()),
         }
     }
 
-    pub fn acquire<'a>(&'a self) -> Option<DongleGuard<'a>> {
+    pub fn acquire<'a>(&'a self, coder_number: usize) -> Option<DongleGuard<'a>> {
         let mut guard = self.state.lock().unwrap();
+
+        // add the coder to the waiting queue
+        {
+            let mut queue = self.priority_queue.lock().unwrap();
+            queue.push_back(coder_number);
+        }
 
         loop {
             // if the shutdown signal has been sent by the burnout tracker, exit
@@ -48,6 +57,15 @@ impl Dongle {
                 if *shutdown {
                     return None;
                 }
+            }
+
+            let is_my_turn = {
+                let queue = self.priority_queue.lock().unwrap();
+                *queue.front().unwrap() == coder_number
+            };
+
+            if !is_my_turn {
+                continue;
             }
 
             match *guard {
@@ -62,6 +80,9 @@ impl Dongle {
                         // wait for the cooldown to end.
                         (guard, _) = self.cv.wait_timeout(guard, next_available - now).unwrap();
                     } else {
+                        // remove the coder from the queue
+                        let mut queue = self.priority_queue.lock().unwrap();
+                        queue.pop_front();
                         // make the dongle not available while being held
                         *guard = Held;
                         return Some(DongleGuard { dongle: self });
