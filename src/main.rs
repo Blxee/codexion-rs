@@ -3,7 +3,12 @@ use crate::args::Args;
 use std::env::args;
 
 fn main() {
-    let args: Args = args().try_into().unwrap();
+    let args: Args = match args().try_into() {
+        Ok(args) => args,
+        Err(err) => {
+            return eprintln!("{err:?}");
+        }
+    };
 
     dbg!(args);
 }

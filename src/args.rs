@@ -21,6 +21,10 @@ pub enum ArgsError {
         argument: &'static str,
         source: ParseIntError,
     },
+    InvalidNumberRange {
+        argument: &'static str,
+        min_value: u32,
+    },
     InvalidScheduler,
 }
 
@@ -38,6 +42,13 @@ impl TryFrom<ProgramArgs> for Args {
             argument: "number_of_coders",
             source,
         })?;
+
+        if number_of_coders < 1 {
+            return Err(ArgsError::InvalidNumberRange {
+                argument: "number_of_coders",
+                min_value: 1,
+            });
+        }
 
         let time_to_burnout: u32 = args[2].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "time_to_burnout",
