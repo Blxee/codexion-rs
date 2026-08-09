@@ -12,7 +12,11 @@ pub struct Args {
     pub scheduler: Scheduler,
 }
 
-type Scheduler = String;
+#[derive(Debug, Clone, Copy)]
+pub enum Scheduler {
+    FIFO,
+    EDF,
+}
 
 #[derive(Debug)]
 pub enum ArgsError {
@@ -81,9 +85,9 @@ impl TryFrom<ProgramArgs> for Args {
             source,
         })?;
 
-        let scheduler: String = match args[8].as_str() {
-            "fifo" => "fifo".to_string(),
-            "edf" => "edf".to_string(),
+        let scheduler = match args[8].as_str() {
+            "fifo" => Scheduler::FIFO,
+            "edf" => Scheduler::EDF,
             _ => return Err(ArgsError::InvalidScheduler),
         };
 

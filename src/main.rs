@@ -1,5 +1,6 @@
 mod args;
-use crate::args::Args;
+mod codexion;
+use crate::{args::Args, codexion::Codexion};
 use std::env::args;
 
 fn main() {
@@ -10,5 +11,8 @@ fn main() {
         }
     };
 
-    dbg!(args);
+    dbg!(&args);
+
+    let codexion = Codexion::new(&args);
+    codexion.start();
 }
