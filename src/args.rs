@@ -1,61 +1,79 @@
-use std::env::Args as ProgramArgs;
+use std::{env::Args as ProgramArgs, num::ParseIntError};
 
 #[derive(Debug)]
 pub struct Args {
-    number_of_coders: u32,
-    time_to_burnout: u32,
-    time_to_compile: u32,
-    time_to_debug: u32,
-    time_to_refactor: u32,
-    number_of_compiles_required: u32,
-    dongle_cooldown: u32,
-    scheduler: Scheduler,
+    pub number_of_coders: u32,
+    pub time_to_burnout: u32,
+    pub time_to_compile: u32,
+    pub time_to_debug: u32,
+    pub time_to_refactor: u32,
+    pub number_of_compiles_required: u32,
+    pub dongle_cooldown: u32,
+    pub scheduler: Scheduler,
 }
 
 type Scheduler = String;
 
+#[derive(Debug)]
+pub enum ArgsError {
+    InvalidArgumentCount,
+    InvalidNumber {
+        argument: &'static str,
+        source: ParseIntError,
+    },
+    InvalidScheduler,
+}
+
 impl TryFrom<ProgramArgs> for Args {
-    type Error = &'static str;
+    type Error = ArgsError;
 
     fn try_from(args: ProgramArgs) -> Result<Self, Self::Error> {
         let args: Vec<_> = args.collect();
 
         if args.len() != 9 {
-            return Err("Invalid amount of arguments");
+            return Err(ArgsError::InvalidArgumentCount);
         }
 
-        let number_of_coders = args[1]
-            .parse()
-            .map_err(|_| "number_of_coders is not a valid number")?;
+        let number_of_coders = args[1].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "number_of_coders",
+            source,
+        })?;
 
-        let time_to_burnout: u32 = args[2]
-            .parse()
-            .map_err(|_| "time_to_burnoutis not a valid number")?;
+        let time_to_burnout: u32 = args[2].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "time_to_burnout",
+            source,
+        })?;
 
-        let time_to_compile: u32 = args[3]
-            .parse()
-            .map_err(|_| "time_to_compileis not a valid number")?;
+        let time_to_compile: u32 = args[3].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "time_to_compile",
+            source,
+        })?;
 
-        let time_to_debug: u32 = args[4]
-            .parse()
-            .map_err(|_| "time_to_debugis not a valid number")?;
+        let time_to_debug: u32 = args[4].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "time_to_debug",
+            source,
+        })?;
 
-        let time_to_refactor: u32 = args[5]
-            .parse()
-            .map_err(|_| "time_to_refactoris not a valid number")?;
+        let time_to_refactor: u32 = args[5].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "time_to_refactor",
+            source,
+        })?;
 
-        let number_of_compiles_required: u32 = args[6]
-            .parse()
-            .map_err(|_| "number_of_compiles_requiredis not a valid number")?;
+        let number_of_compiles_required: u32 =
+            args[6].parse().map_err(|source| ArgsError::InvalidNumber {
+                argument: "number_of_compiles_required",
+                source,
+            })?;
 
-        let dongle_cooldown: u32 = args[7]
-            .parse()
-            .map_err(|_| "dongle_cooldownis not a valid number")?;
+        let dongle_cooldown: u32 = args[7].parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: "dongle_cooldown",
+            source,
+        })?;
 
         let scheduler: String = match args[8].as_str() {
             "fifo" => "fifo".to_string(),
             "edf" => "edf".to_string(),
-            _ => return Err("Invalid scheduler"),
+            _ => return Err(ArgsError::InvalidScheduler),
         };
 
         Ok(Self {
