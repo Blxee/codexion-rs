@@ -11,14 +11,17 @@ use crate::logging::Logging;
 
 pub struct Codexion {
     args: Args,
-    coders: Vec<Coder>,
+    coders: Vec<Arc<Coder>>,
     start_signal: Arc<(Mutex<bool>, Condvar)>,
+    stop_signal: Arc<(Mutex<bool>, Condvar)>,
     logging: Arc<Logging>,
 }
 
 impl Codexion {
     pub fn new(args: Args) -> Self {
         let start_signal = Arc::new((Mutex::new(false), Condvar::new()));
+        let stop_signal = Arc::new((Mutex::new(false), Condvar::new()));
+
         let logging = Arc::new(Logging::new());
 
         let dongles: Vec<Arc<Dongle>> = (0..args.number_of_coders)
@@ -44,15 +47,17 @@ impl Codexion {
                 first_dongle,
                 second_dongle,
                 Arc::clone(&start_signal),
+                Arc::clone(&stop_signal),
                 Arc::clone(&logging),
             );
-            coders.push(coder);
+            coders.push(Arc::new(coder));
         }
 
         Self {
             args,
             coders,
             start_signal,
+            stop_signal,
             logging,
         }
     }
@@ -60,7 +65,10 @@ impl Codexion {
     pub fn start(self) {
         // create all the threads
         let mut handles = Vec::new();
-        for coder in self.coders {
+
+        for coder in &self.coders {
+            let coder = Arc::clone(&coder);
+
             let handle = thread::spawn(move || coder.start_routine());
             handles.push(handle);
         }
@@ -69,6 +77,8 @@ impl Codexion {
             let mut logging_start_time = self.logging.start_time_lock.lock().unwrap();
             *logging_start_time = Instant::now();
         }
+        // start monitoring coders
+        self.monitor();
         // signal the coders to start
         {
             let mut start_mutex = self.start_signal.0.lock().unwrap();
@@ -79,5 +89,9 @@ impl Codexion {
         for handle in handles {
             handle.join().unwrap();
         }
+    }
+
+    fn monitor(&self) {
+        println!("monitor started");
     }
 }

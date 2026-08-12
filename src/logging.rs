@@ -92,7 +92,7 @@ impl Logging {
         let coder_id_color = COLOR_CYCLE[coder_id as usize % COLOR_CYCLE.len()];
 
         format!(
-            "{BOLD}[{FG_BLUE}{current_time:08}{RESET}{BOLD}:{FG_BLACK}{BG_WHITE}coder_{coder_id_color}{coder_id:03}{RESET}{BOLD}]{RESET}"
+            "{BOLD}[{RESET}{FG_BLACK}{BG_WHITE}{current_time:08}{RESET}{BOLD}:{FG_WHITE}coder_{coder_id_color}{coder_id:03}{RESET}{BOLD}]{RESET}"
         )
     }
 }

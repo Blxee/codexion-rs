@@ -39,13 +39,15 @@ impl Dongle {
                 }
 
                 DongleState::CoolingDownUntil(next_available) => {
-                    if Instant::now() >= next_available {
+                    let now = Instant::now();
+
+                    if now >= next_available {
                         *state = DongleState::Held;
                         break DongleGuard(self);
                     } else {
                         (state, _) = self
                             .release_signal
-                            .wait_timeout(state, next_available - Instant::now())
+                            .wait_timeout(state, next_available - now)
                             .unwrap();
                     }
                 }
@@ -57,13 +59,13 @@ impl Dongle {
         }
     }
 
-    fn release(&self) {
+    pub fn release(&self) {
         let mut state = self.state.lock().unwrap();
 
         match *state {
             DongleState::Held => {
                 *state = DongleState::CoolingDownUntil(Instant::now() + self.cooldown);
-                self.release_signal.notify_all();
+                self.release_signal.notify_one();
             }
             _ => (),
         }
