@@ -1,6 +1,6 @@
 use std::{env::Args as ProgramArgs, num::ParseIntError};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Args {
     pub number_of_coders: u32,
     pub time_to_burnout: u32,

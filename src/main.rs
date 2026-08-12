@@ -13,6 +13,6 @@ fn main() {
 
     dbg!(&args);
 
-    let codexion = Codexion::new(&args);
+    let codexion = Codexion::new(args);
     codexion.start();
 }
