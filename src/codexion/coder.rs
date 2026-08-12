@@ -48,7 +48,7 @@ impl Coder {
         }
 
         self.logging.compile(self.id);
-        sleep(Duration::from_millis(1000));
+        sleep(self.args.time_to_compile);
 
         for i in 0..handles.len() {
             self.logging.release(self.id, i as u32 + 1);
@@ -57,11 +57,11 @@ impl Coder {
 
     fn debug(&self) {
         self.logging.debug(self.id);
-        sleep(Duration::from_millis(1000));
+        sleep(self.args.time_to_debug);
     }
 
     fn refactor(&self) {
         self.logging.refactor(self.id);
-        sleep(Duration::from_millis(1000));
+        sleep(self.args.time_to_refactor);
     }
 }

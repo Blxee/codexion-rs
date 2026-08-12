@@ -1,14 +1,14 @@
-use std::{env::Args as ProgramArgs, num::ParseIntError};
+use std::{env::Args as ProgramArgs, num::ParseIntError, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Args {
     pub number_of_coders: u32,
-    pub time_to_burnout: u32,
-    pub time_to_compile: u32,
-    pub time_to_debug: u32,
-    pub time_to_refactor: u32,
+    pub time_to_burnout: Duration,
+    pub time_to_compile: Duration,
+    pub time_to_debug: Duration,
+    pub time_to_refactor: Duration,
     pub number_of_compiles_required: u32,
-    pub dongle_cooldown: u32,
+    pub dongle_cooldown: Duration,
     pub scheduler: Scheduler,
 }
 
@@ -54,22 +54,22 @@ impl TryFrom<ProgramArgs> for Args {
             });
         }
 
-        let time_to_burnout: u32 = args[2].parse().map_err(|source| ArgsError::InvalidNumber {
+        let time_to_burnout: u64 = args[2].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "time_to_burnout",
             source,
         })?;
 
-        let time_to_compile: u32 = args[3].parse().map_err(|source| ArgsError::InvalidNumber {
+        let time_to_compile: u64 = args[3].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "time_to_compile",
             source,
         })?;
 
-        let time_to_debug: u32 = args[4].parse().map_err(|source| ArgsError::InvalidNumber {
+        let time_to_debug: u64 = args[4].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "time_to_debug",
             source,
         })?;
 
-        let time_to_refactor: u32 = args[5].parse().map_err(|source| ArgsError::InvalidNumber {
+        let time_to_refactor: u64 = args[5].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "time_to_refactor",
             source,
         })?;
@@ -80,7 +80,7 @@ impl TryFrom<ProgramArgs> for Args {
                 source,
             })?;
 
-        let dongle_cooldown: u32 = args[7].parse().map_err(|source| ArgsError::InvalidNumber {
+        let dongle_cooldown: u64 = args[7].parse().map_err(|source| ArgsError::InvalidNumber {
             argument: "dongle_cooldown",
             source,
         })?;
@@ -90,6 +90,12 @@ impl TryFrom<ProgramArgs> for Args {
             "edf" => Scheduler::EDF,
             _ => return Err(ArgsError::InvalidScheduler),
         };
+
+        let time_to_burnout = Duration::from_millis(time_to_burnout);
+        let time_to_compile = Duration::from_millis(time_to_compile);
+        let time_to_debug = Duration::from_millis(time_to_debug);
+        let time_to_refactor = Duration::from_millis(time_to_refactor);
+        let dongle_cooldown = Duration::from_millis(dongle_cooldown);
 
         Ok(Self {
             number_of_coders,
