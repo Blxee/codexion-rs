@@ -10,7 +10,7 @@ pub struct Coder {
     args: Args,
     id: u32,
     dongles: [Arc<Dongle>; 2],
-    start_cond: Arc<Condvar>,
+    start_signal: Arc<(Mutex<bool>, Condvar)>,
     logging: Arc<Logging>,
 }
 
@@ -19,19 +19,27 @@ impl Coder {
         id: u32,
         args: Args,
         dongles: [Arc<Dongle>; 2],
-        start_cond: Arc<Condvar>,
+        start_signal: Arc<(Mutex<bool>, Condvar)>,
         logging: Arc<Logging>,
     ) -> Self {
         Self {
             args,
             id,
             dongles,
-            start_cond,
+            start_signal,
             logging,
         }
     }
 
-    pub fn start_routine(&self, start_time: Instant) {
+    pub fn start_routine(&self) {
+        // wait until the main thread signals start
+        {
+            let mut start_guard = self.start_signal.0.lock().unwrap();
+            while !*start_guard {
+                start_guard = self.start_signal.1.wait(start_guard).unwrap();
+            }
+        }
+
         for _ in 0..self.args.number_of_compiles_required {
             self.compile();
             self.debug();
@@ -41,7 +49,6 @@ impl Coder {
 
     fn compile(&self) {
         let mut handles = Vec::new();
-
         for (i, dongle) in self.dongles.iter().enumerate() {
             handles.push(dongle.acquire());
             self.logging.acquire(self.id, i as u32 + 1);

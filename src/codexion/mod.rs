@@ -1,6 +1,6 @@
 mod coder;
 mod dongle;
-use std::sync::{Arc, Condvar};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::Instant;
 
@@ -12,13 +12,13 @@ use crate::logging::Logging;
 pub struct Codexion {
     args: Args,
     coders: Vec<Coder>,
-    start_cond: Arc<Condvar>,
+    start_signal: Arc<(Mutex<bool>, Condvar)>,
     logging: Arc<Logging>,
 }
 
 impl Codexion {
     pub fn new(args: Args) -> Self {
-        let start_cond = Arc::new(Condvar::new());
+        let start_signal = Arc::new((Mutex::new(false), Condvar::new()));
         let logging = Arc::new(Logging::new());
 
         let coders = (0..args.number_of_coders)
@@ -27,7 +27,7 @@ impl Codexion {
                     id + 1,
                     args,
                     [Arc::new(Dongle::new()), Arc::new(Dongle::new())],
-                    Arc::clone(&start_cond),
+                    Arc::clone(&start_signal),
                     Arc::clone(&logging),
                 )
             })
@@ -35,26 +35,30 @@ impl Codexion {
         Self {
             args,
             coders,
-            start_cond,
+            start_signal,
             logging,
         }
     }
 
     pub fn start(self) {
+        // create all the threads
         let mut handles = Vec::new();
-
-        let start_time = Instant::now();
-
         for coder in self.coders {
-            let handle = thread::spawn(move || coder.start_routine(start_time));
+            let handle = thread::spawn(move || coder.start_routine());
             handles.push(handle);
         }
-
+        // set start time to this instant for logging
         {
             let mut logging_start_time = self.logging.start_time_lock.lock().unwrap();
             *logging_start_time = Instant::now();
         }
-
+        // signal the coders to start
+        {
+            let mut start_mutex = self.start_signal.0.lock().unwrap();
+            *start_mutex = true;
+            self.start_signal.1.notify_all();
+        }
+        // join all threads
         for handle in handles {
             handle.join().unwrap();
         }
