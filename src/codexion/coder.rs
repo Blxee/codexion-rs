@@ -1,31 +1,37 @@
 use std::{
     sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle, sleep},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
-use crate::{args::Args, codexion::dongle::Dongle};
+use crate::{args::Args, codexion::dongle::Dongle, logging::Logging};
 
 pub struct Coder {
     args: Args,
     id: u32,
     dongles: [Arc<Dongle>; 2],
     start_cond: Arc<Condvar>,
+    logging: Arc<Logging>,
 }
 
 impl Coder {
-    pub fn new(id: u32, args: Args, dongles: [Arc<Dongle>; 2], start_cond: Arc<Condvar>) -> Self {
+    pub fn new(
+        id: u32,
+        args: Args,
+        dongles: [Arc<Dongle>; 2],
+        start_cond: Arc<Condvar>,
+        logging: Arc<Logging>,
+    ) -> Self {
         Self {
             args,
             id,
             dongles,
             start_cond,
+            logging,
         }
     }
 
-    pub fn routine(&self) {
-        println!("starting routine");
-
+    pub fn start_routine(&self, start_time: Instant) {
         for _ in 0..self.args.number_of_compiles_required {
             self.compile();
             self.debug();
@@ -35,18 +41,27 @@ impl Coder {
 
     fn compile(&self) {
         let mut handles = Vec::new();
-        for dongle in &self.dongles {
+
+        for (i, dongle) in self.dongles.iter().enumerate() {
             handles.push(dongle.acquire());
+            self.logging.acquire(self.id, i as u32 + 1);
         }
-        println!("compiling..");
+
+        self.logging.compile(self.id);
         sleep(Duration::from_millis(1000));
+
+        for i in 0..handles.len() {
+            self.logging.release(self.id, i as u32 + 1);
+        }
     }
+
     fn debug(&self) {
-        println!("debugging..");
+        self.logging.debug(self.id);
         sleep(Duration::from_millis(1000));
     }
+
     fn refactor(&self) {
-        println!("refactoring..");
+        self.logging.refactor(self.id);
         sleep(Duration::from_millis(1000));
     }
 }

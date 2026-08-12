@@ -8,13 +8,10 @@ impl Dongle {
     }
 
     pub fn acquire(&self) -> DongleGuard {
-        println!("dongle acquired");
         DongleGuard(self)
     }
 
-    fn release(&self) {
-        println!("dongle released");
-    }
+    fn release(&self) {}
 }
 
 impl<'a> Drop for DongleGuard<'a> {

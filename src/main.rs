@@ -1,5 +1,6 @@
 mod args;
 mod codexion;
+mod logging;
 use crate::{args::Args, codexion::Codexion};
 use std::env::args;
 
