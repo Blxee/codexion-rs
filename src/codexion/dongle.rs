@@ -1,5 +1,5 @@
 use std::{
-    sync::{Condvar, Mutex},
+    sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
 };
 
@@ -8,7 +8,8 @@ use crate::args::Args;
 pub struct Dongle {
     cooldown: Duration,
     state: Mutex<DongleState>,
-    release_signal: Condvar,
+    pub release_signal: Condvar,
+    stop_signal: Arc<(Mutex<bool>, Condvar)>,
 }
 
 enum DongleState {
@@ -20,22 +21,28 @@ enum DongleState {
 pub struct DongleGuard<'a>(&'a Dongle);
 
 impl Dongle {
-    pub fn new(args: Args) -> Self {
+    pub fn new(args: Args, stop_signal: Arc<(Mutex<bool>, Condvar)>) -> Self {
         Self {
             cooldown: args.dongle_cooldown,
             state: Mutex::new(DongleState::Available),
             release_signal: Condvar::new(),
+            stop_signal,
         }
     }
 
-    pub fn acquire<'a>(&'a self) -> DongleGuard<'a> {
+    pub fn acquire<'a>(&'a self) -> Option<DongleGuard<'a>> {
         let mut state = self.state.lock().unwrap();
 
         loop {
+            // check whether a stop signal was sent by the monitor
+            if *self.stop_signal.0.lock().unwrap() {
+                break None;
+            }
+
             match *state {
                 DongleState::Available => {
                     *state = DongleState::Held;
-                    break DongleGuard(self);
+                    break Some(DongleGuard(self));
                 }
 
                 DongleState::CoolingDownUntil(next_available) => {
@@ -43,7 +50,7 @@ impl Dongle {
 
                     if now >= next_available {
                         *state = DongleState::Held;
-                        break DongleGuard(self);
+                        break Some(DongleGuard(self));
                     } else {
                         (state, _) = self
                             .release_signal

@@ -11,6 +11,7 @@ use crate::logging::Logging;
 
 pub struct Codexion {
     args: Args,
+    dongles: Vec<Arc<Dongle>>,
     coders: Vec<Arc<Coder>>,
     start_signal: Arc<(Mutex<bool>, Condvar)>,
     stop_signal: Arc<(Mutex<bool>, Condvar)>,
@@ -25,7 +26,7 @@ impl Codexion {
         let logging = Arc::new(Logging::new());
 
         let dongles: Vec<Arc<Dongle>> = (0..args.number_of_coders)
-            .map(|_| Arc::new(Dongle::new(args)))
+            .map(|_| Arc::new(Dongle::new(args, Arc::clone(&stop_signal))))
             .collect();
 
         let mut coders = Vec::new();
@@ -55,6 +56,7 @@ impl Codexion {
 
         Self {
             args,
+            dongles,
             coders,
             start_signal,
             stop_signal,
@@ -77,14 +79,14 @@ impl Codexion {
             let mut logging_start_time = self.logging.start_time_lock.lock().unwrap();
             *logging_start_time = Instant::now();
         }
-        // start monitoring coders
-        self.monitor();
         // signal the coders to start
         {
             let mut start_mutex = self.start_signal.0.lock().unwrap();
             *start_mutex = true;
             self.start_signal.1.notify_all();
         }
+        // start monitoring coders
+        self.monitor();
         // join all threads
         for handle in handles {
             handle.join().unwrap();
@@ -92,6 +94,23 @@ impl Codexion {
     }
 
     fn monitor(&self) {
-        println!("monitor started");
+        loop {
+            for coder in &self.coders {
+                let last_compile_time = *coder.last_compile_time.lock().unwrap();
+
+                if Instant::now() - last_compile_time >= self.args.time_to_burnout {
+                    let mut stop = self.stop_signal.0.lock().unwrap();
+                    *stop = true;
+                    self.stop_signal.1.notify_all();
+
+                    for dongle in &self.dongles {
+                        dongle.release_signal.notify_all();
+                    }
+
+                    self.logging.burnout(coder.id);
+                    return;
+                }
+            }
+        }
     }
 }

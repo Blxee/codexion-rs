@@ -78,7 +78,7 @@ impl Logging {
     pub fn burnout(&self, coder_id: u32) {
         let start_time = self.start_time_lock.lock().unwrap();
         println!(
-            "{}\t {FG_BLACK}{BG_RED}{BOLD}BURNED OUT{RESET}",
+            "{}\t {FG_WHITE}{BG_RED}{BOLD} BURNED OUT {RESET}",
             self.time_id_prefix(*start_time, coder_id)
         );
     }
