@@ -1,4 +1,5 @@
 mod coder;
+mod dongle;
 use std::sync::{Arc, Condvar};
 use std::thread;
 
