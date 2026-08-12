@@ -1,7 +1,7 @@
 mod coder;
 mod dongle;
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread;
+use std::thread::{self, sleep};
 use std::time::Instant;
 
 use crate::args::Args;
@@ -96,6 +96,7 @@ impl Codexion {
     fn monitor(&self) {
         loop {
             let mut all_finished = true;
+            let mut earliest_compile_time = Instant::now();
 
             for coder in &self.coders {
                 let compile_count = *coder.compile_count.lock().unwrap();
@@ -107,15 +108,12 @@ impl Codexion {
 
                 let last_compile_time = *coder.last_compile_time.lock().unwrap();
 
+                if last_compile_time < earliest_compile_time {
+                    earliest_compile_time = last_compile_time;
+                }
+
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
-                    let mut stop = self.stop_signal.0.lock().unwrap();
-                    *stop = true;
-                    self.stop_signal.1.notify_all();
-
-                    for dongle in &self.dongles {
-                        dongle.release_signal.notify_all();
-                    }
-
+                    self.shutdown();
                     self.logging.burnout(coder.id);
                     return;
                 }
@@ -124,6 +122,18 @@ impl Codexion {
             if all_finished {
                 break;
             }
+
+            sleep(self.args.time_to_burnout - (Instant::now() - earliest_compile_time));
+        }
+    }
+
+    fn shutdown(&self) {
+        let mut stop = self.stop_signal.0.lock().unwrap();
+        *stop = true;
+        self.stop_signal.1.notify_all();
+
+        for dongle in &self.dongles {
+            dongle.release_signal.notify_all();
         }
     }
 }
