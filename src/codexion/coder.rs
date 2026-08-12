@@ -9,6 +9,7 @@ use crate::{args::Args, codexion::dongle::Dongle, logging::Logging};
 pub struct Coder {
     args: Args,
     pub id: u32,
+    pub compile_count: Mutex<u32>,
     pub last_compile_time: Mutex<Instant>,
     first_dongle: Arc<Dongle>,
     second_dongle: Arc<Dongle>,
@@ -30,6 +31,7 @@ impl Coder {
         Self {
             args,
             id,
+            compile_count: Mutex::new(0),
             last_compile_time: Mutex::new(Instant::now()),
             first_dongle,
             second_dongle,
@@ -98,6 +100,11 @@ impl Coder {
         {
             let mut last_compile_time = self.last_compile_time.lock().unwrap();
             *last_compile_time = Instant::now();
+        }
+        // update compile count
+        {
+            let mut compile_count = self.compile_count.lock().unwrap();
+            *compile_count += 1;
         }
     }
 

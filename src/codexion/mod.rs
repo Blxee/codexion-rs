@@ -95,7 +95,16 @@ impl Codexion {
 
     fn monitor(&self) {
         loop {
+            let mut all_finished = true;
+
             for coder in &self.coders {
+                let compile_count = *coder.compile_count.lock().unwrap();
+                if compile_count == self.args.number_of_compiles_required {
+                    continue;
+                } else {
+                    all_finished = false;
+                }
+
                 let last_compile_time = *coder.last_compile_time.lock().unwrap();
 
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
@@ -110,6 +119,10 @@ impl Codexion {
                     self.logging.burnout(coder.id);
                     return;
                 }
+            }
+
+            if all_finished {
+                break;
             }
         }
     }
