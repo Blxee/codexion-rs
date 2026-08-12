@@ -9,7 +9,8 @@ use crate::{args::Args, codexion::dongle::Dongle, logging::Logging};
 pub struct Coder {
     args: Args,
     id: u32,
-    dongles: [Arc<Dongle>; 2],
+    first_dongle: Arc<Dongle>,
+    second_dongle: Arc<Dongle>,
     start_signal: Arc<(Mutex<bool>, Condvar)>,
     logging: Arc<Logging>,
 }
@@ -18,14 +19,16 @@ impl Coder {
     pub fn new(
         id: u32,
         args: Args,
-        dongles: [Arc<Dongle>; 2],
+        first_dongle: Arc<Dongle>,
+        second_dongle: Arc<Dongle>,
         start_signal: Arc<(Mutex<bool>, Condvar)>,
         logging: Arc<Logging>,
     ) -> Self {
         Self {
             args,
             id,
-            dongles,
+            first_dongle,
+            second_dongle,
             start_signal,
             logging,
         }
@@ -48,18 +51,16 @@ impl Coder {
     }
 
     fn compile(&self) {
-        let mut handles = Vec::new();
-        for (i, dongle) in self.dongles.iter().enumerate() {
-            handles.push(dongle.acquire());
-            self.logging.acquire(self.id, i as u32 + 1);
-        }
+        let _first_dongle_guard = self.first_dongle.acquire();
+        self.logging.acquire(self.id, 1);
+        let _second_dongle_guard = self.second_dongle.acquire();
+        self.logging.acquire(self.id, 2);
 
         self.logging.compile(self.id);
         sleep(self.args.time_to_compile);
 
-        for i in 0..handles.len() {
-            self.logging.release(self.id, i as u32 + 1);
-        }
+        self.logging.release(self.id, 1);
+        self.logging.release(self.id, 2);
     }
 
     fn debug(&self) {

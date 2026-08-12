@@ -21,17 +21,34 @@ impl Codexion {
         let start_signal = Arc::new((Mutex::new(false), Condvar::new()));
         let logging = Arc::new(Logging::new());
 
-        let coders = (0..args.number_of_coders)
-            .map(|id| {
-                Coder::new(
-                    id + 1,
-                    args,
-                    [Arc::new(Dongle::new()), Arc::new(Dongle::new())],
-                    Arc::clone(&start_signal),
-                    Arc::clone(&logging),
-                )
-            })
+        let dongles: Vec<Arc<Dongle>> = (0..args.number_of_coders)
+            .map(|_| Arc::new(Dongle::new(args)))
             .collect();
+
+        let mut coders = Vec::new();
+
+        for i in 0..args.number_of_coders {
+            let mut first_idx = i as usize;
+            let mut second_idx = ((i + 1) % args.number_of_coders) as usize;
+
+            if i % 2 == 0 {
+                (first_idx, second_idx) = (second_idx, first_idx);
+            }
+
+            let first_dongle = Arc::clone(&dongles[first_idx]);
+            let second_dongle = Arc::clone(&dongles[second_idx]);
+
+            let coder = Coder::new(
+                i + 1,
+                args,
+                first_dongle,
+                second_dongle,
+                Arc::clone(&start_signal),
+                Arc::clone(&logging),
+            );
+            coders.push(coder);
+        }
+
         Self {
             args,
             coders,
