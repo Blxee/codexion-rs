@@ -1,22 +1,24 @@
 use std::{
-    sync::{Arc, Condvar},
+    sync::{Arc, Condvar, Mutex},
     thread::{self, JoinHandle, sleep},
     time::Duration,
 };
 
-use crate::args::Args;
+use crate::{args::Args, codexion::dongle::Dongle};
 
 pub struct Coder {
     args: Args,
     id: u32,
+    dongles: [Arc<Dongle>; 2],
     start_cond: Arc<Condvar>,
 }
 
 impl Coder {
-    pub fn new(id: u32, args: Args, start_cond: Arc<Condvar>) -> Self {
+    pub fn new(id: u32, args: Args, dongles: [Arc<Dongle>; 2], start_cond: Arc<Condvar>) -> Self {
         Self {
             args,
             id,
+            dongles,
             start_cond,
         }
     }
@@ -32,6 +34,10 @@ impl Coder {
     }
 
     fn compile(&self) {
+        let mut handles = Vec::new();
+        for dongle in &self.dongles {
+            handles.push(dongle.acquire());
+        }
         println!("compiling..");
         sleep(Duration::from_millis(1000));
     }

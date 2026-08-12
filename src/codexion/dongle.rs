@@ -1,18 +1,19 @@
 pub struct Dongle {}
 
-struct DongleGuard<'a>(&'a mut Dongle);
+pub struct DongleGuard<'a>(&'a Dongle);
 
 impl Dongle {
     pub fn new() -> Self {
         Self {}
     }
 
-    pub fn acquire(&mut self) -> DongleGuard {
+    pub fn acquire(&self) -> DongleGuard {
+        println!("dongle acquired");
         DongleGuard(self)
     }
 
-    fn release(&mut self) {
-        todo!()
+    fn release(&self) {
+        println!("dongle released");
     }
 }
 

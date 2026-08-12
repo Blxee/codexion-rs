@@ -5,6 +5,7 @@ use std::thread;
 
 use crate::args::Args;
 use crate::codexion::coder::Coder;
+use crate::codexion::dongle::Dongle;
 
 pub struct Codexion {
     args: Args,
@@ -16,7 +17,14 @@ impl Codexion {
     pub fn new(args: Args) -> Self {
         let start_cond = Arc::new(Condvar::new());
         let coders = (0..args.number_of_coders)
-            .map(|id| Coder::new(id, args, Arc::clone(&start_cond)))
+            .map(|id| {
+                Coder::new(
+                    id,
+                    args,
+                    [Arc::new(Dongle::new()), Arc::new(Dongle::new())],
+                    Arc::clone(&start_cond),
+                )
+            })
             .collect();
         Self {
             args,
