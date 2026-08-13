@@ -75,13 +75,17 @@ impl Coder {
     fn compile(&self) {
         {
             // acquire first dongle
-            let first_dongle_guard = self.first_dongle.acquire(self.id);
+            let first_dongle_guard = self
+                .first_dongle
+                .acquire(self.id, self.get_last_compile_time());
             if first_dongle_guard.is_none() {
                 return;
             }
             self.logging.acquire(self.id, 1);
             // acquire second dongle
-            let second_dongle_guard = self.second_dongle.acquire(self.id);
+            let second_dongle_guard = self
+                .second_dongle
+                .acquire(self.id, self.get_last_compile_time());
             if second_dongle_guard.is_none() {
                 return;
             }
@@ -131,5 +135,9 @@ impl Coder {
             .unwrap();
 
         timeout.timed_out()
+    }
+
+    fn get_last_compile_time(&self) -> Instant {
+        *self.last_compile_time.lock().unwrap()
     }
 }

@@ -19,7 +19,7 @@ pub struct Dongle {
 
 enum SchedulingStrategy {
     Queue(VecDeque<u32>),
-    Heap(BinaryHeap<u32>),
+    Heap(BinaryHeap<(Instant, u32)>),
 }
 
 enum DongleState {
@@ -46,16 +46,14 @@ impl Dongle {
         }
     }
 
-    pub fn acquire<'a>(&'a self, coder_id: u32) -> Option<DongleGuard<'a>> {
+    pub fn acquire<'a>(
+        &'a self,
+        coder_id: u32,
+        last_compile_time: Instant,
+    ) -> Option<DongleGuard<'a>> {
         let mut state = self.state.lock().unwrap();
 
-        {
-            let mut scheduling = self.scheduling.lock().unwrap();
-            match &mut *scheduling {
-                SchedulingStrategy::Queue(queue) => queue.push_front(coder_id),
-                SchedulingStrategy::Heap(heap) => heap.push(coder_id),
-            }
-        }
+        self.add_coder_to_waiting_line(coder_id, last_compile_time);
 
         loop {
             // check whether a stop signal was sent by the monitor
@@ -63,7 +61,7 @@ impl Dongle {
                 break None;
             }
 
-            let result = match *state {
+            let dongle_guard = match *state {
                 DongleState::Available => {
                     *state = DongleState::Held;
                     Some(DongleGuard(self))
@@ -90,32 +88,46 @@ impl Dongle {
                 }
             };
 
-            if result.is_some() {
-                match &mut *self.scheduling.lock().unwrap() {
-                    SchedulingStrategy::Queue(queue) => {
-                        let next_id_in_line = queue.back();
+            if dongle_guard.is_some() && self.try_pop_coder_from_line(coder_id) {
+                break dongle_guard;
+            }
+        }
+    }
 
-                        if let Some(&next_id) = next_id_in_line
-                            && next_id == coder_id
-                        {
-                            queue.pop_back();
-                            break result;
-                        }
-                    }
+    fn add_coder_to_waiting_line(&self, coder_id: u32, last_compile_time: Instant) {
+        let mut scheduling = self.scheduling.lock().unwrap();
 
-                    SchedulingStrategy::Heap(heap) => {
-                        let next_id_in_line = heap.peek();
+        match &mut *scheduling {
+            SchedulingStrategy::Queue(queue) => queue.push_front(coder_id),
+            SchedulingStrategy::Heap(heap) => heap.push((last_compile_time, coder_id)),
+        }
+    }
 
-                        if let Some(&next_id) = next_id_in_line
-                            && next_id == coder_id
-                        {
-                            heap.pop();
-                            break result;
-                        }
-                    }
+    fn try_pop_coder_from_line(&self, coder_id: u32) -> bool {
+        match &mut *self.scheduling.lock().unwrap() {
+            SchedulingStrategy::Queue(queue) => {
+                let next_id_in_line = queue.back();
+
+                if let Some(&next_id) = next_id_in_line
+                    && next_id == coder_id
+                {
+                    queue.pop_back();
+                    return true;
+                }
+            }
+
+            SchedulingStrategy::Heap(heap) => {
+                let next_id_in_line = heap.peek();
+
+                if let Some(&(_, next_id)) = next_id_in_line
+                    && next_id == coder_id
+                {
+                    heap.pop();
+                    return true;
                 }
             }
         }
+        false
     }
 
     pub fn release(&self) {
