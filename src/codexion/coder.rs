@@ -75,13 +75,13 @@ impl Coder {
     fn compile(&self) {
         {
             // acquire first dongle
-            let first_dongle_guard = self.first_dongle.acquire();
+            let first_dongle_guard = self.first_dongle.acquire(self.id);
             if first_dongle_guard.is_none() {
                 return;
             }
             self.logging.acquire(self.id, 1);
             // acquire second dongle
-            let second_dongle_guard = self.second_dongle.acquire();
+            let second_dongle_guard = self.second_dongle.acquire(self.id);
             if second_dongle_guard.is_none() {
                 return;
             }
