@@ -1,4 +1,5 @@
 use std::{
+    cmp::Reverse,
     collections::{BinaryHeap, VecDeque},
     sync::{Arc, Condvar, Mutex},
     time::{Duration, Instant},
@@ -19,7 +20,7 @@ pub struct Dongle {
 
 enum SchedulingStrategy {
     Queue(VecDeque<u32>),
-    Heap(BinaryHeap<(Instant, u32)>),
+    Heap(BinaryHeap<(Reverse<Instant>, u32)>),
 }
 
 enum DongleState {
@@ -99,7 +100,7 @@ impl Dongle {
 
         match &mut *scheduling {
             SchedulingStrategy::Queue(queue) => queue.push_front(coder_id),
-            SchedulingStrategy::Heap(heap) => heap.push((last_compile_time, coder_id)),
+            SchedulingStrategy::Heap(heap) => heap.push((Reverse(last_compile_time), coder_id)),
         }
     }
 
@@ -119,7 +120,7 @@ impl Dongle {
             SchedulingStrategy::Heap(heap) => {
                 let next_id_in_line = heap.peek();
 
-                if let Some(&(_, next_id)) = next_id_in_line
+                if let Some(&(Reverse(_), next_id)) = next_id_in_line
                     && next_id == coder_id
                 {
                     heap.pop();
