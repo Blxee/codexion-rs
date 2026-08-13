@@ -4,7 +4,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{args::Args, codexion::dongle::Dongle, logging::Logging};
+use crate::{
+    args::Args,
+    codexion::{Signal, dongle::Dongle},
+    logging::Logging,
+};
 
 pub struct Coder {
     args: Args,
@@ -13,8 +17,8 @@ pub struct Coder {
     pub last_compile_time: Mutex<Instant>,
     first_dongle: Arc<Dongle>,
     second_dongle: Arc<Dongle>,
-    start_signal: Arc<(Mutex<bool>, Condvar)>,
-    stop_signal: Arc<(Mutex<bool>, Condvar)>,
+    start_signal: Arc<Signal>,
+    stop_signal: Arc<Signal>,
     logging: Arc<Logging>,
 }
 
@@ -24,8 +28,8 @@ impl Coder {
         args: Args,
         first_dongle: Arc<Dongle>,
         second_dongle: Arc<Dongle>,
-        start_signal: Arc<(Mutex<bool>, Condvar)>,
-        stop_signal: Arc<(Mutex<bool>, Condvar)>,
+        start_signal: Arc<Signal>,
+        stop_signal: Arc<Signal>,
         logging: Arc<Logging>,
     ) -> Self {
         Self {
@@ -44,9 +48,9 @@ impl Coder {
     pub fn start_routine(&self) {
         // wait until the main thread signals start
         {
-            let mut start_guard = self.start_signal.0.lock().unwrap();
+            let mut start_guard = self.start_signal.state.lock().unwrap();
             while !*start_guard {
-                start_guard = self.start_signal.1.wait(start_guard).unwrap();
+                start_guard = self.start_signal.cond.wait(start_guard).unwrap();
             }
         }
 
@@ -58,12 +62,11 @@ impl Coder {
 
         for _ in 0..self.args.number_of_compiles_required {
             for action in [Coder::compile, Coder::debug, Coder::refactor] {
-                let should_stop = *self.stop_signal.0.lock().unwrap();
+                action(self);
 
+                let should_stop = *self.stop_signal.state.lock().unwrap();
                 if should_stop {
                     return;
-                } else {
-                    action(self);
                 }
             }
         }
@@ -119,11 +122,11 @@ impl Coder {
     }
 
     fn sleep(&self, duration: Duration) -> bool {
-        let stop_guard = self.stop_signal.0.lock().unwrap();
+        let stop_guard = self.stop_signal.state.lock().unwrap();
 
         let (_guard, timeout) = self
             .stop_signal
-            .1
+            .cond
             .wait_timeout(stop_guard, duration)
             .unwrap();
 

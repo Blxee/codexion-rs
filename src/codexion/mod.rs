@@ -13,15 +13,26 @@ pub struct Codexion {
     args: Args,
     dongles: Vec<Arc<Dongle>>,
     coders: Vec<Arc<Coder>>,
-    start_signal: Arc<(Mutex<bool>, Condvar)>,
-    stop_signal: Arc<(Mutex<bool>, Condvar)>,
+    start_signal: Arc<Signal>,
+    stop_signal: Arc<Signal>,
     logging: Arc<Logging>,
+}
+
+struct Signal {
+    state: Mutex<bool>,
+    cond: Condvar,
 }
 
 impl Codexion {
     pub fn new(args: Args) -> Self {
-        let start_signal = Arc::new((Mutex::new(false), Condvar::new()));
-        let stop_signal = Arc::new((Mutex::new(false), Condvar::new()));
+        let start_signal = Arc::new(Signal {
+            state: Mutex::new(false),
+            cond: Condvar::new(),
+        });
+        let stop_signal = Arc::new(Signal {
+            state: Mutex::new(false),
+            cond: Condvar::new(),
+        });
 
         let logging = Arc::new(Logging::new());
 
@@ -35,7 +46,7 @@ impl Codexion {
             let mut first_idx = i as usize;
             let mut second_idx = ((i + 1) % args.number_of_coders) as usize;
 
-            if i % 2 == 0 {
+            if first_idx > second_idx {
                 (first_idx, second_idx) = (second_idx, first_idx);
             }
 
@@ -81,9 +92,9 @@ impl Codexion {
         }
         // signal the coders to start
         {
-            let mut start_mutex = self.start_signal.0.lock().unwrap();
+            let mut start_mutex = self.start_signal.state.lock().unwrap();
             *start_mutex = true;
-            self.start_signal.1.notify_all();
+            self.start_signal.cond.notify_all();
         }
         // start monitoring coders
         self.monitor();
@@ -123,17 +134,18 @@ impl Codexion {
                 break;
             }
 
-            sleep(self.args.time_to_burnout - (Instant::now() - earliest_compile_time));
+            let elapsed = Instant::now() - earliest_compile_time;
+            sleep(self.args.time_to_burnout.saturating_sub(elapsed));
         }
     }
 
     fn shutdown(&self) {
-        let mut stop = self.stop_signal.0.lock().unwrap();
+        let mut stop = self.stop_signal.state.lock().unwrap();
         *stop = true;
-        self.stop_signal.1.notify_all();
+        self.stop_signal.cond.notify_all();
 
         for dongle in &self.dongles {
-            dongle.release_signal.notify_all();
+            dongle.release_cond.notify_all();
         }
     }
 }

@@ -3,13 +3,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::args::Args;
+use crate::{args::Args, codexion::Signal};
 
 pub struct Dongle {
     cooldown: Duration,
     state: Mutex<DongleState>,
-    pub release_signal: Condvar,
-    stop_signal: Arc<(Mutex<bool>, Condvar)>,
+    pub release_cond: Condvar,
+    stop_signal: Arc<Signal>,
 }
 
 enum DongleState {
@@ -21,11 +21,11 @@ enum DongleState {
 pub struct DongleGuard<'a>(&'a Dongle);
 
 impl Dongle {
-    pub fn new(args: Args, stop_signal: Arc<(Mutex<bool>, Condvar)>) -> Self {
+    pub fn new(args: Args, stop_signal: Arc<Signal>) -> Self {
         Self {
             cooldown: args.dongle_cooldown,
             state: Mutex::new(DongleState::Available),
-            release_signal: Condvar::new(),
+            release_cond: Condvar::new(),
             stop_signal,
         }
     }
@@ -35,7 +35,7 @@ impl Dongle {
 
         loop {
             // check whether a stop signal was sent by the monitor
-            if *self.stop_signal.0.lock().unwrap() {
+            if *self.stop_signal.state.lock().unwrap() {
                 break None;
             }
 
@@ -53,14 +53,14 @@ impl Dongle {
                         break Some(DongleGuard(self));
                     } else {
                         (state, _) = self
-                            .release_signal
+                            .release_cond
                             .wait_timeout(state, next_available - now)
                             .unwrap();
                     }
                 }
 
                 DongleState::Held => {
-                    state = self.release_signal.wait(state).unwrap();
+                    state = self.release_cond.wait(state).unwrap();
                 }
             }
         }
@@ -72,7 +72,7 @@ impl Dongle {
         match *state {
             DongleState::Held => {
                 *state = DongleState::CoolingDownUntil(Instant::now() + self.cooldown);
-                self.release_signal.notify_one();
+                self.release_cond.notify_one();
             }
             _ => (),
         }
