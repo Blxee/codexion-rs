@@ -142,8 +142,10 @@ impl Codexion {
     }
 
     fn shutdown(&self) {
-        let mut stop = self.stop_signal.state.lock().unwrap();
-        *stop = true;
+        {
+            let mut stop = self.stop_signal.state.lock().unwrap();
+            *stop = true;
+        }
         self.stop_signal.cond.notify_all();
 
         for dongle in &self.dongles {
