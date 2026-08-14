@@ -41,7 +41,7 @@ impl Codexion {
             .collect();
 
         let mut coders = Vec::new();
-
+        // create coders
         for i in 0..args.number_of_coders {
             let mut first_idx = i as usize;
             let mut second_idx = ((i + 1) % args.number_of_coders) as usize;
@@ -111,6 +111,7 @@ impl Codexion {
 
             for coder in &self.coders {
                 let compile_count = *coder.compile_count.lock().unwrap();
+                // if coder has reached mandatory compiles, skip him
                 if compile_count == self.args.number_of_compiles_required {
                     continue;
                 } else {
@@ -118,11 +119,12 @@ impl Codexion {
                 }
 
                 let last_compile_time = *coder.last_compile_time.lock().unwrap();
-
                 if last_compile_time < earliest_compile_time {
                     earliest_compile_time = last_compile_time;
                 }
 
+                // if last compile time is more than burnout time
+                // stop the simulation
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
                     self.shutdown();
                     self.logging.burnout(coder.id);
