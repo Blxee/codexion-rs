@@ -1,4 +1,6 @@
-use std::{env::Args as ProgramArgs, num::ParseIntError, time::Duration};
+use std::{
+    env::Args as ProgramArgs, error::Error, fmt::Display, num::ParseIntError, time::Duration,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Args {
@@ -27,7 +29,7 @@ pub enum ArgsError {
     },
     InvalidNumberRange {
         argument: &'static str,
-        min_value: u32,
+        min_value: u64,
     },
     InvalidScheduler,
 }
@@ -37,16 +39,11 @@ impl TryFrom<ProgramArgs> for Args {
 
     fn try_from(args: ProgramArgs) -> Result<Self, Self::Error> {
         let args: Vec<_> = args.collect();
-
         if args.len() != 9 {
             return Err(ArgsError::InvalidArgumentCount);
         }
 
-        let number_of_coders = args[1].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "number_of_coders",
-            source,
-        })?;
-
+        let number_of_coders: u32 = Self::parse_u32(&args[1], "number_of_coders")?;
         if number_of_coders < 1 {
             return Err(ArgsError::InvalidNumberRange {
                 argument: "number_of_coders",
@@ -54,42 +51,23 @@ impl TryFrom<ProgramArgs> for Args {
             });
         }
 
-        let time_to_burnout: u64 = args[2].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "time_to_burnout",
-            source,
-        })?;
-
-        let time_to_compile: u64 = args[3].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "time_to_compile",
-            source,
-        })?;
-
-        let time_to_debug: u64 = args[4].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "time_to_debug",
-            source,
-        })?;
-
-        let time_to_refactor: u64 = args[5].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "time_to_refactor",
-            source,
-        })?;
+        let time_to_burnout: u64 = Self::parse_u64(&args[2], "time_to_burnout")?;
+        let time_to_compile: u64 = Self::parse_u64(&args[3], "time_to_compile")?;
+        let time_to_debug: u64 = Self::parse_u64(&args[4], "time_to_debug")?;
+        let time_to_refactor: u64 = Self::parse_u64(&args[5], "time_to_refactor")?;
 
         let number_of_compiles_required: u32 =
-            args[6].parse().map_err(|source| ArgsError::InvalidNumber {
+            Self::parse_u32(&args[6], " number_of_compiles_required")?;
+        if number_of_compiles_required < 1 {
+            return Err(ArgsError::InvalidNumberRange {
                 argument: "number_of_compiles_required",
-                source,
-            })?;
+                min_value: 1,
+            });
+        }
 
-        let dongle_cooldown: u64 = args[7].parse().map_err(|source| ArgsError::InvalidNumber {
-            argument: "dongle_cooldown",
-            source,
-        })?;
+        let dongle_cooldown: u64 = Self::parse_u64(&args[7], "dongle_cooldown")?;
 
-        let scheduler = match args[8].as_str() {
-            "fifo" => Scheduler::FIFO,
-            "edf" => Scheduler::EDF,
-            _ => return Err(ArgsError::InvalidScheduler),
-        };
+        let scheduler = args[8].as_str().try_into()?;
 
         let time_to_burnout = Duration::from_millis(time_to_burnout);
         let time_to_compile = Duration::from_millis(time_to_compile);
@@ -109,3 +87,53 @@ impl TryFrom<ProgramArgs> for Args {
         })
     }
 }
+
+impl Args {
+    fn parse_u64(value: &String, arg_name: &'static str) -> Result<u64, ArgsError> {
+        value.parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: arg_name,
+            source,
+        })
+    }
+
+    fn parse_u32(value: &String, arg_name: &'static str) -> Result<u32, ArgsError> {
+        value.parse().map_err(|source| ArgsError::InvalidNumber {
+            argument: arg_name,
+            source,
+        })
+    }
+}
+
+impl TryFrom<&str> for Scheduler {
+    type Error = ArgsError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "fifo" => Ok(Scheduler::FIFO),
+            "edf" => Ok(Scheduler::EDF),
+            _ => Err(ArgsError::InvalidScheduler),
+        }
+    }
+}
+
+impl Display for ArgsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArgsError::InvalidArgumentCount => write!(f, "Error: invalid argument count"),
+            ArgsError::InvalidNumber { argument, source } => write!(
+                f,
+                "Error: invalid number for argument '{argument}': {source}"
+            ),
+            ArgsError::InvalidNumberRange {
+                argument,
+                min_value,
+            } => write!(
+                f,
+                "Error: invalid number range for argument '{argument}' (min_value: {min_value})"
+            ),
+            ArgsError::InvalidScheduler => write!(f, "Error: invalid scheduler"),
+        }
+    }
+}
+
+impl Error for ArgsError {}
