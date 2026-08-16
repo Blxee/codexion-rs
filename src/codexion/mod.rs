@@ -1,5 +1,6 @@
 mod coder;
 mod dongle;
+use std::collections::HashSet;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, sleep};
 use std::time::Instant;
@@ -105,6 +106,8 @@ impl Codexion {
     }
 
     fn monitor(&self) {
+        let mut burned_out = HashSet::new();
+
         loop {
             let mut all_finished = true;
             let mut earliest_compile_time = Instant::now();
@@ -118,6 +121,10 @@ impl Codexion {
                     all_finished = false;
                 }
 
+                if burned_out.contains(&coder.id) {
+                    continue;
+                }
+
                 let last_compile_time = *coder.last_compile_time.lock().unwrap();
                 if last_compile_time < earliest_compile_time {
                     earliest_compile_time = last_compile_time;
@@ -125,9 +132,14 @@ impl Codexion {
 
                 // if last compile time is more than burnout time
                 // stop the simulation
+
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
-                    self.shutdown();
+                    burned_out.insert(coder.id);
                     self.logging.burnout(coder.id);
+                }
+
+                if burned_out.len() as u32 == self.args.number_of_coders {
+                    self.shutdown();
                     return;
                 }
             }
