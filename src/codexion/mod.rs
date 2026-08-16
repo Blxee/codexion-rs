@@ -88,7 +88,7 @@ impl Codexion {
         }
         // set start time to this instant for logging
         {
-            let mut logging_start_time = self.logging.start_time_lock.lock().unwrap();
+            let logging_start_time = &mut self.logging.state.lock().unwrap().start_time;
             *logging_start_time = Instant::now();
         }
         // signal the coders to start
