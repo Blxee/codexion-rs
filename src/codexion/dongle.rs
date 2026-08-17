@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub struct Dongle {
+    pub id: u32,
     cooldown: Duration,
     state: Mutex<DongleState>,
     pub release_cond: Condvar,
@@ -36,13 +37,14 @@ enum DongleAvailability {
 pub struct DongleGuard<'a>(&'a Dongle);
 
 impl Dongle {
-    pub fn new(args: Args, stop_signal: Arc<Signal>) -> Self {
+    pub fn new(args: Args, id: u32, stop_signal: Arc<Signal>) -> Self {
         let scheduling = match args.scheduler {
             Scheduler::FIFO => SchedulingStrategy::Queue(VecDeque::with_capacity(2)),
             Scheduler::EDF => SchedulingStrategy::Heap(BinaryHeap::with_capacity(2)),
         };
 
         Self {
+            id,
             cooldown: args.dongle_cooldown,
             state: Mutex::new(DongleState {
                 availability: DongleAvailability::Available,

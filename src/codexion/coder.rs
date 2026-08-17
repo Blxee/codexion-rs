@@ -1,6 +1,5 @@
 use std::{
-    sync::{Arc, Condvar, Mutex},
-    thread::{self, JoinHandle, sleep},
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -81,7 +80,7 @@ impl Coder {
             if first_dongle_guard.is_none() {
                 return;
             }
-            self.logging.acquire(self.id, 1);
+            self.logging.acquire(self.id, self.first_dongle.id);
             // acquire second dongle
             let second_dongle_guard = self
                 .second_dongle
@@ -89,7 +88,7 @@ impl Coder {
             if second_dongle_guard.is_none() {
                 return;
             }
-            self.logging.acquire(self.id, 2);
+            self.logging.acquire(self.id, self.second_dongle.id);
 
             // compile
             self.logging.compile(self.id);
@@ -99,8 +98,8 @@ impl Coder {
                 return;
             }
 
-            self.logging.release(self.id, 1);
-            self.logging.release(self.id, 2);
+            self.logging.release(self.id, self.first_dongle.id);
+            self.logging.release(self.id, self.second_dongle.id);
         }
 
         // update latest compile time to now

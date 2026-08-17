@@ -38,7 +38,7 @@ impl Codexion {
         let logging = Arc::new(Logging::new());
 
         let dongles: Vec<Arc<Dongle>> = (0..args.number_of_coders)
-            .map(|_| Arc::new(Dongle::new(args, Arc::clone(&stop_signal))))
+            .map(|id| Arc::new(Dongle::new(args, id, Arc::clone(&stop_signal))))
             .collect();
 
         let mut coders = Vec::new();
@@ -103,6 +103,7 @@ impl Codexion {
         for handle in handles {
             handle.join().unwrap();
         }
+        self.logging.wait_for_exit();
     }
 
     fn monitor(&self) {
