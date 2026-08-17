@@ -69,6 +69,8 @@ impl Coder {
                 }
             }
         }
+
+        self.logging.finished(self.id);
     }
 
     fn compile(&self) {
