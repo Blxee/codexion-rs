@@ -84,9 +84,8 @@ impl Logging {
     }
 
     fn time_id_prefix(&self, start_time: Instant, coder_id: u32) -> String {
-        const COLOR_CYCLE: [&'static str; 7] = [
-            FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_MAGENTA, FG_CYAN, FG_BLACK,
-        ];
+        const COLOR_CYCLE: [&'static str; 6] =
+            [FG_RED, FG_GREEN, FG_YELLOW, FG_BLUE, FG_MAGENTA, FG_CYAN];
 
         let current_time = start_time.elapsed().as_millis();
         let coder_id_color = COLOR_CYCLE[coder_id as usize % COLOR_CYCLE.len()];

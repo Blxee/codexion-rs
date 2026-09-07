@@ -91,6 +91,12 @@ impl Coder {
             }
             self.logging.acquire(self.id, 2);
 
+            // update latest compile time to now
+            {
+                let mut last_compile_time = self.last_compile_time.lock().unwrap();
+                *last_compile_time = Instant::now();
+            }
+
             // compile
             self.logging.compile(self.id);
             let timedout = self.sleep(self.args.time_to_compile);
@@ -103,11 +109,6 @@ impl Coder {
             self.logging.release(self.id, 2);
         }
 
-        // update latest compile time to now
-        {
-            let mut last_compile_time = self.last_compile_time.lock().unwrap();
-            *last_compile_time = Instant::now();
-        }
         // update compile count
         {
             let mut compile_count = self.compile_count.lock().unwrap();
