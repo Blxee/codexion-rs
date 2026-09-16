@@ -15,6 +15,7 @@ pub struct Codexion {
     coders: Vec<Arc<Coder>>,
     start_signal: Arc<Signal>,
     stop_signal: Arc<Signal>,
+    compile_cond: Arc<(Mutex<()>, Condvar)>,
     logging: Arc<Logging>,
 }
 
@@ -33,6 +34,8 @@ impl Codexion {
             state: Mutex::new(false),
             cond: Condvar::new(),
         });
+
+        let compile_cond = Arc::new((Mutex::new(()), Condvar::new()));
 
         let logging = Arc::new(Logging::new());
 
@@ -60,6 +63,7 @@ impl Codexion {
                 second_dongle,
                 Arc::clone(&start_signal),
                 Arc::clone(&stop_signal),
+                Arc::clone(&compile_cond),
                 Arc::clone(&logging),
             );
             coders.push(Arc::new(coder));
@@ -71,6 +75,7 @@ impl Codexion {
             coders,
             start_signal,
             stop_signal,
+            compile_cond,
             logging,
         }
     }
@@ -110,18 +115,21 @@ impl Codexion {
             let mut earliest_compile_time = Instant::now();
 
             for coder in &self.coders {
-                let compile_count = *coder.compile_count.lock().unwrap();
-                // if coder has reached mandatory compiles, skip him
-                if compile_count == self.args.number_of_compiles_required {
-                    continue;
-                } else {
-                    all_finished = false;
-                }
+                let last_compile_time = {
+                    let compile_state = coder.compile_state.state.lock().unwrap();
+                    // if coder has reached mandatory compiles, skip him
+                    if compile_state.compile_count == self.args.number_of_compiles_required {
+                        continue;
+                    } else {
+                        all_finished = false;
+                    }
 
-                let last_compile_time = *coder.last_compile_time.lock().unwrap();
-                if last_compile_time < earliest_compile_time {
-                    earliest_compile_time = last_compile_time;
-                }
+                    if compile_state.last_compile_time < earliest_compile_time {
+                        earliest_compile_time = compile_state.last_compile_time;
+                    }
+
+                    compile_state.last_compile_time
+                };
 
                 // if last compile time is more than burnout time
                 // stop the simulation
@@ -137,7 +145,10 @@ impl Codexion {
             }
 
             let elapsed = Instant::now() - earliest_compile_time;
-            sleep(self.args.time_to_burnout.saturating_sub(elapsed));
+            let _ = self.compile_cond.1.wait_timeout(
+                self.compile_cond.0.lock().unwrap(),
+                self.args.time_to_burnout.saturating_sub(elapsed),
+            );
         }
     }
 

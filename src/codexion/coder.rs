@@ -13,13 +13,22 @@ use crate::{
 pub struct Coder {
     args: Args,
     pub id: u32,
-    pub compile_count: Mutex<u32>,
-    pub last_compile_time: Mutex<Instant>,
+    pub compile_state: CompileState,
     first_dongle: Arc<Dongle>,
     second_dongle: Arc<Dongle>,
     start_signal: Arc<Signal>,
     stop_signal: Arc<Signal>,
     logging: Arc<Logging>,
+}
+
+pub struct CompileState {
+    pub state: Mutex<CompileInfo>,
+    pub cond: Arc<(Mutex<()>, Condvar)>,
+}
+
+pub struct CompileInfo {
+    pub compile_count: u32,
+    pub last_compile_time: Instant,
 }
 
 impl Coder {
@@ -30,13 +39,20 @@ impl Coder {
         second_dongle: Arc<Dongle>,
         start_signal: Arc<Signal>,
         stop_signal: Arc<Signal>,
+        compile_cond: Arc<(Mutex<()>, Condvar)>,
         logging: Arc<Logging>,
     ) -> Self {
+        let compile_state = CompileState {
+            state: Mutex::new(CompileInfo {
+                compile_count: 0,
+                last_compile_time: Instant::now(),
+            }),
+            cond: compile_cond,
+        };
         Self {
             args,
             id,
-            compile_count: Mutex::new(0),
-            last_compile_time: Mutex::new(Instant::now()),
+            compile_state,
             first_dongle,
             second_dongle,
             start_signal,
@@ -56,8 +72,8 @@ impl Coder {
 
         // make the latest compile time now
         {
-            let mut last_compile_time = self.last_compile_time.lock().unwrap();
-            *last_compile_time = Instant::now();
+            let mut compile_state = self.compile_state.state.lock().unwrap();
+            compile_state.last_compile_time = Instant::now();
         }
 
         for _ in 0..self.args.number_of_compiles_required {
@@ -93,10 +109,9 @@ impl Coder {
 
             // update latest compile time to now
             {
-                let mut last_compile_time = self.last_compile_time.lock().unwrap();
-                *last_compile_time = Instant::now();
+                let mut compile_state = self.compile_state.state.lock().unwrap();
+                compile_state.last_compile_time = Instant::now();
             }
-
             // compile
             self.logging.compile(self.id);
             let timedout = self.sleep(self.args.time_to_compile);
@@ -111,8 +126,9 @@ impl Coder {
 
         // update compile count
         {
-            let mut compile_count = self.compile_count.lock().unwrap();
-            *compile_count += 1;
+            let mut compile_state = self.compile_state.state.lock().unwrap();
+            compile_state.compile_count += 1;
+            self.compile_state.cond.1.notify_all();
         }
     }
 
@@ -139,6 +155,7 @@ impl Coder {
     }
 
     fn get_last_compile_time(&self) -> Instant {
-        *self.last_compile_time.lock().unwrap()
+        let compile_state = self.compile_state.state.lock().unwrap();
+        compile_state.last_compile_time
     }
 }
