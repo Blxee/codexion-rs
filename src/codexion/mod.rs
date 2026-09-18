@@ -49,7 +49,7 @@ impl Codexion {
             let mut first_idx = i as usize;
             let mut second_idx = ((i + 1) % args.number_of_coders) as usize;
 
-            if first_idx > second_idx {
+            if i % 2 == 1 {
                 (first_idx, second_idx) = (second_idx, first_idx);
             }
 
@@ -153,8 +153,10 @@ impl Codexion {
     }
 
     fn shutdown(&self) {
-        let mut stop = self.stop_signal.state.lock().unwrap();
-        *stop = true;
+        {
+            let mut stop = self.stop_signal.state.lock().unwrap();
+            *stop = true;
+        }
         self.stop_signal.cond.notify_all();
 
         for dongle in &self.dongles {
