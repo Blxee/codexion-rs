@@ -134,9 +134,8 @@ impl Codexion {
                 // if last compile time is more than burnout time
                 // stop the simulation
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
-                    self.shutdown();
                     self.logging.burnout(coder.id);
-                    return;
+                    break;
                 }
             }
 
@@ -150,6 +149,7 @@ impl Codexion {
                 self.args.time_to_burnout.saturating_sub(elapsed),
             );
         }
+        self.shutdown();
     }
 
     fn shutdown(&self) {

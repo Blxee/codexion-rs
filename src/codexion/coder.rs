@@ -114,9 +114,9 @@ impl Coder {
             }
             // compile
             self.logging.compile(self.id);
-            let timedout = self.sleep(self.args.time_to_compile);
+            let completed = self.sleep(self.args.time_to_compile);
 
-            if !timedout {
+            if !completed {
                 return;
             }
 
