@@ -110,7 +110,7 @@ impl Codexion {
     }
 
     fn monitor(&self) {
-        loop {
+        'outer: loop {
             let mut all_finished = true;
             let mut earliest_compile_time = Instant::now();
 
@@ -135,7 +135,7 @@ impl Codexion {
                 // stop the simulation
                 if Instant::now() - last_compile_time >= self.args.time_to_burnout {
                     self.logging.burnout(coder.id);
-                    break;
+                    break 'outer;
                 }
             }
 
